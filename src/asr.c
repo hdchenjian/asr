@@ -1,5 +1,7 @@
 #include <string.h>
+#include <time.h>
 
+#include "lista.h"
 #include "mfcc.h"
 #include "hmm.h"
 #include "nrutil.h"
@@ -7,7 +9,7 @@
 
 /*  Number of codevectors, allowed only power of 2 */
 //#define NVQ 32
-#define NVQ 64
+#define VQ_NUM 64
 //#define NVQ 128
 
 /*
@@ -103,11 +105,10 @@ int main()
     int mfcc_coeff_num = N_COEFF_CEP*3;
 
     double **training = matrix_double(frame_num_total, mfcc_coeff_num);
-    double **mfcc_feature = NULL;
     current_audio = lista;
 	int train_set_index = 0, feature_index = 0;
     while(current_audio != NULL) {
-        mfcc_feature = matrix_double(current_audio->frame_num, mfcc_coeff_num);
+        double **mfcc_feature = matrix_double(current_audio->frame_num, mfcc_coeff_num);
         load_matrix_double(current_audio->filename_car, mfcc_feature, current_audio->frame_num, mfcc_coeff_num);
         for(int n = 0; n < current_audio->frame_num; n++){
             for(int k=0; k< mfcc_coeff_num; k++) {
@@ -122,108 +123,76 @@ int main()
     }
     printf("train_num %d, mfcc_coeff_num %d, frame_num_total %d\n", train_num, mfcc_coeff_num, frame_num_total);
 
-
-    double **codebook = lbg(training, frame_num_total, mfcc_coeff_num, NVQ);
-    exit(-1);
-
-    FILE *codebook_file = fopen("codebook.txt","w");
-    for(int n = 0; n < NVQ; n++)
-    {
+    double **codebook = lbg_get_codebook(training, frame_num_total, mfcc_coeff_num, VQ_NUM);
+    printf("lbg_get_codebook, M %d, K %d, N %d\n", frame_num_total, mfcc_coeff_num, VQ_NUM);
+    FILE *codebook_file = fopen("obj/codebook.txt", "w");
+    for(int n = 0; n < VQ_NUM; n++) {
         fprintf(codebook_file,"%d\n", n);
-        for(int k = 0; k<mfcc_coeff_num; k++) fprintf(codebook_file,"%f\t", codebook[n][k]);
+        for(int k = 0; k < mfcc_coeff_num; k++) fprintf(codebook_file,"%f\t", codebook[n][k]);
         fprintf(codebook_file,"\n");
     }
+    fclose(codebook_file);
 
+    FILE *feature_vq = fopen("obj/feature_vq.txt","w");
     current_audio = lista;
-    char *nome = NULL;
-    int *sequenza = NULL;
-    char *pos = NULL;
-
-    FILE *tutte_sequenze = NULL;
-    tutte_sequenze = fopen("tutte_sequenze.txt","w");
-
-    int N_vq = NVQ + 1;
-    /*  After the codebook, it determines the vector quantization for every vector of the training set */
-    while(current_audio != NULL)
-    {
-        mfcc_feature = matrix_double(current_audio->frame_num, mfcc_coeff_num-1);
-        load_matrix_double(current_audio->filename_car, mfcc_feature, current_audio->frame_num, mfcc_coeff_num-1);
-
+    while(current_audio != NULL) {
+        double **mfcc_feature = matrix_double(current_audio->frame_num, mfcc_coeff_num);
+        load_matrix_double(current_audio->filename_car, mfcc_feature, current_audio->frame_num, mfcc_coeff_num);
         /*  The quantized vector is the vector of sequences that will be used in the Hidden Markov Models */
-        sequenza = vq(codebook, mfcc_feature, current_audio->frame_num, mfcc_coeff_num, N_vq);
-        nome = strdup(current_audio->filename);
-        /*  Find the last character '.' */
-        pos = strrchr(nome, '.' );
-        int i = pos-nome;
-        /*  After '.' changes the extension */
-        nome[i+1] = 's';
-        nome[i+2] = 'e';
-        nome[i+3] = 'q';
+        int *vq_sequence = lbg_encode(codebook, mfcc_feature, current_audio->frame_num, mfcc_coeff_num, VQ_NUM);
 
-        fprintf(tutte_sequenze,"%s\n", current_audio->filename);
-        for(int n = 1; n<=current_audio->frame_num; n++)
-        {
-            fprintf(tutte_sequenze, "%d\t", sequenza[n]);
+        char *filename_vq = strdup(current_audio->filename);
+        char *pos = strrchr(filename_vq, '.' );
+        int i = pos - filename_vq;
+        filename_vq[i+1] = 's';
+        filename_vq[i+2] = 'e';
+        filename_vq[i+3] = 'q';
+
+        fprintf(feature_vq,"%s\n", current_audio->filename);
+        for(int n = 0; n < current_audio->frame_num; n++) {
+            fprintf(feature_vq, "%d\t", vq_sequence[n]);
         }
-        fprintf(tutte_sequenze, "\n\n");
+        fprintf(feature_vq, "\n\n");
 
-
-        strcpy(current_audio->filename_seq, nome);
-        save_array_int(current_audio->filename_seq, sequenza, current_audio->frame_num +1);
-
+        strcpy(current_audio->filename_seq, filename_vq);
+        save_array_int(current_audio->filename_seq, vq_sequence, current_audio->frame_num);
+        free(vq_sequence);
         current_audio = current_audio->next;
     }
+    fclose(feature_vq);
 
-    /*  Set the seed of the random. */
-    unsigned int seed = 333;
-
-    current_audio = lista;
 
     HMM hmm;
-    /*  In the Hidden Markov Models:
-        - M is the number of the observed symbols
-        - N is the number of states */
-    int M = NVQ;
-    int N = 5;
-
-    double	logprobinit, logprobfinal;
-    double 	**alpha;
-    double	**beta;
-    double	**gamma;
-
-    int T, niter, T_max = 0;
-
+    int observed_num = VQ_NUM;
+    int status_num = 5;
+    double **alpha;
+    double **beta;
+    double **gamma;
+    current_audio = lista;
     while(current_audio != NULL) {
-        nome = strdup(current_audio->filename);
-        pos = strrchr(nome, '.' );
-        int i = pos-nome;
-        nome[i+1] = 'h';
-        nome[i+2] = 'm';
-        nome[i+3] = 'm';
-
-        strcpy(current_audio->filename_hmm, nome);
-        int *O = array_int(current_audio->frame_num +1);
-        load_array_int(current_audio->filename_seq, O, current_audio->frame_num +1);
-        T = current_audio->frame_num;
-        if(T_max<T) T_max = T;
+        char *filename_hmm = strdup(current_audio->filename);
+        char *pos = strrchr(filename_hmm, '.' );
+        int i = pos-filename_hmm;
+        filename_hmm[i+1] = 'h';
+        filename_hmm[i+2] = 'm';
+        filename_hmm[i+3] = 'm';
+        strcpy(current_audio->filename_hmm, filename_hmm);
+        int *observe_sequence = array_int(current_audio->frame_num);
+        load_array_int(current_audio->filename_seq, observe_sequence, current_audio->frame_num);
 
 #if SC==1
-        InitHMM_SC1(&hmm, N, M, seed);
+        InitHMM_SC1(&hmm, status_num, observed_num, time(0));
 #elif SC==2
-        InitHMM_SC2(&hmm, N, M, seed);
+        InitHMM_SC2(&hmm, status_num, observed_num, time(0));
 #endif
-
-        alpha = dmatrix(1, T, 1, hmm.N);
-        beta = dmatrix(1, T, 1, hmm.N);
-        gamma = dmatrix(1, T, 1, hmm.N);
-
-        BaumWelch_C(&hmm, T, O, alpha, beta, gamma, &niter, &logprobinit, &logprobfinal);
-
-        Salva_HMM(current_audio->filename_hmm, &hmm);
-
+        alpha = dmatrix(1, current_audio->frame_num, 1, hmm.N);
+        beta = dmatrix(1, current_audio->frame_num, 1, hmm.N);
+        gamma = dmatrix(1, current_audio->frame_num, 1, hmm.N);
+        BaumWelch_C(&hmm, current_audio->frame_num, observe_sequence, alpha, beta, gamma);
+        save_hmm(current_audio->filename_hmm, &hmm);
         current_audio = current_audio->next;
     }
-
+    return 0;
     double 	proba[train_num];
     int	*q;
     double **delta;
@@ -283,29 +252,28 @@ int main()
 
 
     FILE *risultati = fopen("risultati.txt","w");
-    for(int j = 0; j<parole; j++)
-    {
+    for(int j = 0; j<parole; j++) {
         current_audio = lista;
 
         frequenza_campionamento = campioni_segnale = n_finestre = 0;
 
         segnale = open_wav(analizza[j], &frequenza_campionamento, &campioni_segnale);
-        mfcc_feature = extract_mfcc(segnale, frequenza_campionamento, campioni_segnale,
+        double **mfcc_feature = extract_mfcc(segnale, frequenza_campionamento, campioni_segnale,
         		FREQUENZA_MAX, DIM_FINESTRA, DIM_PASSO, N_COEFF_CEP, &n_finestre);
 
-        sequenza = vq(codebook, mfcc_feature, n_finestre, mfcc_coeff_num, N_vq);
+        int *sequenza = lbg_encode(codebook, mfcc_feature, n_finestre, mfcc_coeff_num, VQ_NUM);
 
-        T = n_finestre;
+        int T = n_finestre;
 
         q = ivector(1,T);
-        delta = dmatrix(1, T, 1, N);
-        psi = imatrix(1, T, 1, N);
+        delta = dmatrix(1, T, 1, status_num);
+        psi = imatrix(1, T, 1, status_num);
 
         int i = 0;
         while(current_audio != NULL)
         {
             proba[i] = 0;
-            Carica_HMM(current_audio->filename_hmm, &hmm, N, M);
+            load_hmm(current_audio->filename_hmm, &hmm, status_num, observed_num);
 
             ViterbiLog_C(&hmm, T, sequenza, delta, psi, q, &proba[i]);
 

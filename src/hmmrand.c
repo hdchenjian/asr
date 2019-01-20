@@ -21,7 +21,6 @@
 /*  In stdlib.h there are function srand() e rand() */
 #include <stdlib.h>
 /*  sys/types.h it is used from the standard POSIX to define all the derived type of data. */
-/*   */
 //#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>

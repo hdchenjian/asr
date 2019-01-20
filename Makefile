@@ -14,7 +14,7 @@ OPTS=-O0 -g
 endif
 CFLAGS+=$(OPTS)
 
-OBJ=mfcc.o backward.o baum.o forward.o hmmrand.o hmmutils.o lbg_vq.o lista.o matrix.o nrutil.o sequence.o viterbi.o
+OBJ=mfcc.o backward.o baum.o forward.o hmmrand.o hmmutils.o lbg_vq.o lista.o matrix.o nrutil.o viterbi.o
 EXECOBJA=asr.o
 EXECOBJ = $(addprefix $(OBJDIR), $(EXECOBJA))
 OBJS = $(addprefix $(OBJDIR), $(OBJ))

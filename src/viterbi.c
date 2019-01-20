@@ -35,7 +35,7 @@ void Viterbi(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, double
 	/*  1. Initialisation */
 	/*  delta_1(i) = pi_i*b_i(O1), with 1 <= i <= N
         psi_1(i)=0 */
-	for (i = 1; i <= phmm->N; i++)
+	for(i = 1; i <= phmm->N; i++)
 	{
 		delta[1][i] = phmm->pi[i] * (phmm->B[i][O[1]]);
 		psi[1][i] = 0;
@@ -44,13 +44,13 @@ void Viterbi(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, double
 	/*  2. Recursion */
 	/*  delta_t(j) = max{delta_t-1(i)*a_ij}*b_j(Ot), with 2 <= t <= T e 1 <= j <= N
         psi_t(j) = arg max{delta_t-1(i)*a_ij}, with 2 <= t <= T e 1 <= j <= N */
-	for (t = 2; t <= T; t++)
+	for(t = 2; t <= T; t++)
 	{
-		for (j = 1; j <= phmm->N; j++)
+		for(j = 1; j <= phmm->N; j++)
 		{
 			maxval = 0.0;
 			maxvalind = 1;
-			for (i = 1; i <= phmm->N; i++)
+			for(i = 1; i <= phmm->N; i++)
 			{
 				val = delta[t-1][i]*(phmm->A[i][j]);
 				//printf("Val: %g\t", val);
@@ -70,7 +70,7 @@ void Viterbi(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, double
         q*_T = arg max delta_T(i) */
 	*pprob = 0.0;
 	q[T] = 1;
-	for (i = 1; i <= phmm->N; i++)
+	for(i = 1; i <= phmm->N; i++)
 	{
 	    if (delta[T][i] > *pprob)
 	    {
@@ -81,7 +81,7 @@ void Viterbi(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, double
 
     /*  4. Backtracking on the path (sequence of states) */
 	/*  q*_t = psi_t+1 (q*_t+1), for t=T-1, T-2, ..., 1*/
-	for (t = T - 1; t >= 1; t--)
+	for(t = T - 1; t >= 1; t--)
 		q[t] = psi[t+1][q[t+1]];
 }
 
@@ -98,37 +98,37 @@ void ViterbiLog(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, dou
 
 	/*  0. Preprocessing */
 
-	for (i = 1; i <= phmm->N; i++)
+	for(i = 1; i <= phmm->N; i++)
 		phmm->pi[i] = log(phmm->pi[i]);
-	for (i = 1; i <= phmm->N; i++)
-		for (j = 1; j <= phmm->N; j++)
+	for(i = 1; i <= phmm->N; i++)
+		for(j = 1; j <= phmm->N; j++)
 		{
 			phmm->A[i][j] = log(phmm->A[i][j]);
 		}
 
 	biot = dmatrix(1, phmm->N, 1, T);
-	for (i = 1; i <= phmm->N; i++)
-		for (t = 1; t <= T; t++)
+	for(i = 1; i <= phmm->N; i++)
+		for(t = 1; t <= T; t++)
 		{
 			biot[i][t] = log(phmm->B[i][O[t]]);
 		}
 
     /*  1. Initialisation  */
 
-    for (i = 1; i <= phmm->N; i++)
+    for(i = 1; i <= phmm->N; i++)
     {
         delta[1][i] = phmm->pi[i] + biot[i][1];
         psi[1][i] = 0;
     }
 
     /*  2. Recursion */
-    for (t = 2; t <= T; t++)
+    for(t = 2; t <= T; t++)
     {
-        for (j = 1; j <= phmm->N; j++)
+        for(j = 1; j <= phmm->N; j++)
         {
             maxval = -VITHUGE;
             maxvalind = 1;
-            for (i = 1; i <= phmm->N; i++)
+            for(i = 1; i <= phmm->N; i++)
             {
                 val = delta[t-1][i] + (phmm->A[i][j]);
                 if (val > maxval)
@@ -145,7 +145,7 @@ void ViterbiLog(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, dou
     /*  3. Termination */
     *pprob = -VITHUGE;
     q[T] = 1;
-    for (i = 1; i <= phmm->N; i++)
+    for(i = 1; i <= phmm->N; i++)
     {
         if (delta[T][i] > *pprob)
         {
@@ -155,7 +155,7 @@ void ViterbiLog(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, dou
     }
 
     /* 4. Backtracking on the path (sequence of states) */
-    for (t = T - 1; t >= 1; t--)
+    for(t = T - 1; t >= 1; t--)
 		q[t] = psi[t+1][q[t+1]];
 }
 
@@ -170,7 +170,7 @@ void ViterbiLog_C(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, d
 
     /*  1. Initialisation  */
 
-   	for (i = 1; i <= phmm->N; i++)
+   	for(i = 1; i <= phmm->N; i++)
 	{
 	    if(phmm->pi[i]*phmm->B[i][O[1]] != 0)
             delta[1][i] = log (phmm->pi[i] * (phmm->B[i][O[1]]));
@@ -180,13 +180,13 @@ void ViterbiLog_C(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, d
 	}
 
     /*  2. Recursion */
-    for (t = 2; t <= T; t++)
+    for(t = 2; t <= T; t++)
     {
-        for (j = 1; j <= phmm->N; j++)
+        for(j = 1; j <= phmm->N; j++)
         {
             maxval = -VITHUGE;
             maxvalind = 1;
-            for (i = 1; i <= phmm->N; i++)
+            for(i = 1; i <= phmm->N; i++)
             {
                 if(phmm->A[i][j]*(phmm->B[j][O[t]]) != 0)
                     val = delta[t-1][i] + log(phmm->A[i][j]*(phmm->B[j][O[t]]));
@@ -206,7 +206,7 @@ void ViterbiLog_C(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, d
     /*  3. Termination */
     *pprob = -VITHUGE;
     q[T] = 1;
-    for (i = 1; i <= phmm->N; i++)
+    for(i = 1; i <= phmm->N; i++)
     {
         if (delta[T][i] > *pprob)
         {
@@ -216,6 +216,6 @@ void ViterbiLog_C(HMM *phmm, int T, int *O, double **delta, int **psi, int *q, d
     }
 
     /* 4. Backtracking on the path (sequence of states) */
-    for (t = T - 1; t >= 1; t--)
+    for(t = T - 1; t >= 1; t--)
 		q[t] = psi[t+1][q[t+1]];
 }

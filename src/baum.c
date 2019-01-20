@@ -1,25 +1,32 @@
-/*
-**      Purpose: Baum-Welch algorithm for estimating the parameters
-**              of a HMM model, given an observation sequence.
-**      Organization: University of Maryland
-
-**	Purpose: Changed the convergence criterion from ratio
-**		to absolute value.
-*/
-/*  Solution to the problem of learning:
-    how to adjust the parameters of the hidden Markov model
-    lambda = (A, B, pi), so as to maximize P(O|lambda)
+/* **	Purpose: Changed the convergence criterion from ratio to absolute value.
+   Solution to the problem of learning: how to adjust the parameters of the hidden Markov model
+   lambda = (A, B, pi), so as to maximize P(O|lambda)
 */
 #include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+
 #include "nrutil.h"
 #include "hmm.h"
-#include <math.h>
 
 #define DELTA 0.001
 #define EPSILON 0.0001
 
-/*  Function that invokes the Baum-Welch algorithm */
-void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double **gamma, int *pniter, double *plogprobinit, double *plogprobfinal)
+/*  Function that calculates the gamma as: gamma_t(i) = { alpha_t(i) * beta_t(i) } / P(O|lambda) */
+void ComputeGamma(HMM *phmm, int T, double **alpha, double **beta, double **gamma)
+{
+    for(int t = 1; t <= T; t++) {
+    	double sum = 0.0;
+        for(int j = 1; j <= phmm->N; j++) {
+            gamma[t][j] = alpha[t][j] * beta[t][j];
+            sum += gamma[t][j];
+        }
+        for(int i = 1; i <= phmm->N; i++) gamma[t][i] /= sum;
+    }
+}
+
+void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double **gamma, int *pniter,
+		double *plogprobinit, double *plogprobfinal)
 {
 	int	i, j, k;
 	int	t, l = 0;
@@ -31,46 +38,46 @@ void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double *
 	double ***xi, *scale;
 	double delta, logprobprev;
 
-	xi = AllocXi(T, phmm->N);
+	xi = alloc_3d_matrix(T, phmm->N);
 	scale = dvector(1, T);
 
 	ForwardWithScale(phmm, T, O, alpha, scale, &logprobf);
 	*plogprobinit = logprobf; /* log P(O |intial model) */
 	BackwardWithScale(phmm, T, O, beta, scale, &logprobb);
 	ComputeGamma(phmm, T, alpha, beta, gamma);
-	ComputeXi(phmm, T, O, alpha, beta, xi);
+	compute_epsilon(phmm, T, O, alpha, beta, xi);
 	logprobprev = logprobf;
 
 	do
 	{
         /*  Re-estimates the frequency of the state i over the time t=1 */
         /*  The robability of being in state S_i at time t */
-		for (i = 1; i <= phmm->N; i++)
+		for(i = 1; i <= phmm->N; i++)
 			phmm->pi[i] = .001 + .999*gamma[1][i];
 
         /*  Re-estimating the transition probability matrix and the different
             observation symbols per state */
 
-		for (i = 1; i <= phmm->N; i++)
+		for(i = 1; i <= phmm->N; i++)
 		{   /*  a^_ij = sum xi_t(i,j) / sum gamma_t(i) */
 			denominatorA = 0.0;
-			for (t = 1; t <= T - 1; t++)
+			for(t = 1; t <= T - 1; t++)
 				denominatorA += gamma[t][i];
 
-			for (j = 1; j <= phmm->N; j++)
+			for(j = 1; j <= phmm->N; j++)
 			{
 				numeratorA = 0.0;
-				for (t = 1; t <= T - 1; t++)
+				for(t = 1; t <= T - 1; t++)
 					numeratorA += xi[t][i][j];
 				phmm->A[i][j] = .001 + .999*numeratorA/denominatorA;
 			}
 
             /*  b^_j(k) = sum gamma_t(j) / sum gamma_t(j) */
 			denominatorB = denominatorA + gamma[T][i];
-			for (k = 1; k <= phmm->M; k++)
+			for(k = 1; k <= phmm->M; k++)
 			{
 				numeratorB = 0.0;
-				for (t = 1; t <= T; t++)
+				for(t = 1; t <= T; t++)
 				{
 					if (O[t] == k)
 						numeratorB += gamma[t][i];
@@ -82,7 +89,7 @@ void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double *
 		ForwardWithScale(phmm, T, O, alpha, scale, &logprobf);
 		BackwardWithScale(phmm, T, O, beta, scale, &logprobb);
 		ComputeGamma(phmm, T, alpha, beta, gamma);
-		ComputeXi(phmm, T, O, alpha, beta, xi);
+		compute_epsilon(phmm, T, O, alpha, beta, xi);
 
         /*  Calculates the difference between the logarithmic probability
             of two iterations, the current and the previous */
@@ -90,199 +97,92 @@ void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double *
 		logprobprev = logprobf;
         /*  Increments the counter that tracks the number of iterations */
 		l++;
-	}while (delta > DELTA);
+	}while(delta > DELTA);
 	/*  Exits from the do while if the logarithmic probability does not change much */
 
 	*pniter = l;
 	/*  log P(O|estimated models) */
 	*plogprobfinal = logprobf;
-	FreeXi(xi, T, phmm->N);
+	free_3d_matrix(xi, T, phmm->N);
 	free_dvector(scale, 1, T);
 }
 
-/*  Function that calculates the gamma as:
-    gamma_t(i) = { alpha_t(i) * beta_t(i) } / P(O|lambda) */
-void ComputeGamma(HMM *phmm, int T, double **alpha, double **beta, double **gamma)
+/*  Function that calculates the xi as: xi_t(i,j) = { alpha_t(i) * beta_t+1(j) * a_ij * b_j } / P(O|lambda) */
+void compute_epsilon(HMM* phmm, int T, int *O, double **alpha, double **beta, double ***xi)
 {
-	int 	i, j;
-	int	t;
-	double	denominator;
-
-	for (t = 1; t <= T; t++)
-	{
-		denominator = 0.0;
-		for (j = 1; j <= phmm->N; j++)
-		{
-			gamma[t][j] = alpha[t][j]*beta[t][j];
-			denominator += gamma[t][j];
-		}
-
-		for (i = 1; i <= phmm->N; i++)
-			gamma[t][i] = gamma[t][i]/denominator;
-	}
-}
-
-/*  Function that calculates the xi as:
-    xi_t(i,j) = { alpha_t(i) * beta_t+1(j) * a_ij * b_j } / P(O|lambda) */
-void ComputeXi(HMM* phmm, int T, int *O, double **alpha, double **beta,	double ***xi)
-{
-	int i, j;
-	int t;
-	double sum;
-
-	for (t = 1; t <= T - 1; t++)
-	{
-		sum = 0.0;
-		for (i = 1; i <= phmm->N; i++)
-			for (j = 1; j <= phmm->N; j++)
-			{
-				xi[t][i][j] = alpha[t][i]*beta[t+1][j]*(phmm->A[i][j])*(phmm->B[j][O[t+1]]);
+	for(int t = 1; t <= T - 1; t++) {
+		double sum = 0.0;
+		for(int i = 1; i <= phmm->N; i++){
+			for(int j = 1; j <= phmm->N; j++) {
+				xi[t][i][j] = alpha[t][i] * beta[t+1][j] * phmm->A[i][j] * phmm->B[j][O[t]];
 				sum += xi[t][i][j];
 			}
-
-		for (i = 1; i <= phmm->N; i++)
-			for (j = 1; j <= phmm->N; j++)
+		}
+		for(int i = 1; i <= phmm->N; i++) {
+			for(int j = 1; j <= phmm->N; j++) {
 				xi[t][i][j] /= sum;
+			}
+		}
 	}
 }
 
-/*  Allocates the array of 3 dimensions xi */
-double *** AllocXi(int T, int N)
+/*  Allocates the array of 3 dimensions x: C * N * N. */
+double ***alloc_3d_matrix(int C, int N)
 {
-	int t;
-	double ***xi;
-
-	xi = (double ***) malloc(T*sizeof(double **));
-
-	xi --;
-
-	for (t = 1; t <= T; t++)
-		xi[t] = dmatrix(1, N, 1, N);
-	return xi;
+	double ***x = (double ***)malloc(C * sizeof(double**));
+	for(int t = 0; t < C; t++) x[t] = dmatrix(1, N, 1, N);
+	return x;
 }
 
-/*  Free the allocated memory space */
-void FreeXi(double *** xi, int T, int N)
+void free_3d_matrix(double ***x, int C, int N)
 {
-	int t;
-
-	for (t = 1; t <= T; t++)
-		free_dmatrix(xi[t], 1, N, 1, N);
-
-	xi ++;
-	free(xi);
+	for(int t = 0; t < C; t++) free_dmatrix(x[t], 1, N, 1, N);
+	free(x);
 }
 
-/*  Added the function to re-estimate the values of HMM, according to the problem of speech recognition */
-void BaumWelch_C(HMM *phmm, int T, int *O, double **alpha, double **beta,	double **gamma, int *pniter, double *plogprobinit, double *plogprobfinal)
+void BaumWelch_C(HMM *hmm, int frame_num, int *O, double **alpha, double **beta, double **gamma)
 {
-	int	i, j, k;
-	int	t, l = 0;
+    double observe_prob, logprobb;
+    Forward(hmm, frame_num, O, alpha, &observe_prob);
+    Backward(hmm, frame_num, O, beta, &logprobb);
+    ComputeGamma(hmm, frame_num, alpha, beta, gamma);
+    double ***epsilon = alloc_3d_matrix(frame_num, hmm->N);
+    compute_epsilon(hmm, frame_num, O, alpha, beta, epsilon);
 
-	double	logprobf, logprobb;
-	double	numeratorA, denominatorA;
-	double	numeratorB, denominatorB;
+    double observe_prob_previous = observe_prob;
+    double delta;
+    do {
+        for(int i = 1; i <= hmm->N; i++) hmm->pi[i] = .001 + .999*gamma[1][i];;
 
-	double ***xi, *scale;
-	double delta, logprobprev;
+        for(int i = 1; i <= hmm->N; i++) {   /*  a^_ij = sum epsilon_t(i,j) / sum gamma_t(i) */
+            double sum = 0.0;
+            for(int t = 1; t <= frame_num - 1; t++) sum += gamma[t][i];
 
-    int temp=0;
-    double somma=0;
-    double val;
-
-	xi = AllocXi(T, phmm->N);
-	scale = dvector(1, T);
-
-	Forward(phmm, T, O, alpha, &logprobf);
-	*plogprobinit =logprobf; /* log P(O |intial model) */
-	Backward(phmm, T, O, beta, &logprobb);
-	ComputeGamma(phmm, T, alpha, beta, gamma);
-	ComputeXi(phmm, T, O, alpha, beta, xi);
-	logprobprev = logprobf;
-
-	do
-	{
-        /*  Re-estimating the frequency of the state i over the time t=1 */
-        /*  The probability of being in state S_i at time t */
-		for (i = 1; i <= phmm->N; i++)
-			//phmm->pi[i] = .001 + .999*gamma[1][i];
-			phmm->pi[i] = gamma[1][i];
-
-        /*  Re-estimating the transition probability matrix and the different observation symbols per state */
-
-		for (i = 1; i <= phmm->N; i++)
-		{   /*  a^_ij = sum xi_t(i,j) / sum gamma_t(i) */
-			denominatorA = 0.0;
-			for (t = 1; t <= T - 1; t++)
-				denominatorA += gamma[t][i];
-
-			for (j = 1; j <= phmm->N; j++)
-			{
-				numeratorA = 0.0;
-				for (t = 1; t <= T - 1; t++)
-					numeratorA += xi[t][i][j];
-				phmm->A[i][j] = numeratorA/denominatorA;
-			}
+            for(int j = 1; j <= hmm->N; j++) {
+            	double tmp = 0.0;
+                for(int t = 1; t <= frame_num - 1; t++) tmp += epsilon[t][i][j];
+                hmm->A[i][j] = 0.001f + 0.999f * tmp / sum;
+            }
 
             /*  b^_j(k) = sum gamma_t(j) / sum gamma_t(j) */
-			denominatorB = denominatorA + gamma[T][i];
-			for (k = 1; k <= phmm->M; k++)
-			{
-				numeratorB = 0.0;
-				for (t = 1; t <= T; t++)
-				{
-					if (O[t] == k)
-						numeratorB += gamma[t][i];
-				}
-				phmm->B[i][k] = numeratorB/denominatorB;
-				if(phmm->B[i][k] < EPSILON)
-				{
-				    phmm->B[i][k] = EPSILON;
-				    ++temp;
-				}
-				else
-                    somma+=phmm->B[i][k];
-			}
-
-            if(temp != phmm->M && temp !=0)
-			{
-			    val = 1-(EPSILON*temp);
-			    for (k = 1; k <= phmm->M; k++)
-                {
-                    if(phmm->B[i][k] != EPSILON)
-                    {
-                        phmm->B[i][k] = phmm->B[i][k] * val / somma ;
-                    }
+            double sum_gamma = sum + gamma[frame_num][i];
+            for(int k = 1; k <= hmm->M; k++) {
+                sum = 0.0;
+                for(int t = 1; t <= frame_num; t++) {
+                    if (O[t] == k) sum += gamma[t][i];
                 }
-			}
+                hmm->B[i][k] = 0.001f + 0.999f * sum / sum_gamma;
+            }
+        }
 
-			if(temp == phmm->M)
-			{
-			    somma=temp*EPSILON;
-			    for (k = 1; k <= phmm->M; k++)
-                    phmm->B[i][k] = phmm->B[i][k] / somma;
-			}
-		}
+        Forward(hmm, frame_num, O, alpha, &observe_prob);
+        Backward(hmm, frame_num, O, beta, &logprobb);
+        ComputeGamma(hmm, frame_num, alpha, beta, gamma);
+        compute_epsilon(hmm, frame_num, O, alpha, beta, epsilon);
 
-        Forward(phmm, T, O, alpha, &logprobf);
-		Backward(phmm, T, O, beta, &logprobb);
-		ComputeGamma(phmm, T, alpha, beta, gamma);
-		ComputeXi(phmm, T, O, alpha, beta, xi);
-
-        /*  Calculates the difference between the logarithmic probability of two iterations,
-            the current and the previous */
-        delta = log(logprobf) - log(logprobprev);
-		logprobprev = logprobf;
-        /*  Increments the counter that tracks the number of iterations */
-
-		l++;
-
-	}while (delta > DELTA);
-	/*  Exits the do while if the logarithmic probability does not change much */
-
-	*pniter = l;
-	/*  log P(O|estimated models) */
-	*plogprobfinal = logprobf;
-	FreeXi(xi, T, phmm->N);
-	free_dvector(scale, 1, T);
+        /* Calculates the difference between the logarithmic probability of two iterations */
+        delta = log(observe_prob) - log(observe_prob_previous);
+        observe_prob_previous = observe_prob;
+    } while(delta > DELTA);
+    free_3d_matrix(epsilon, frame_num, hmm->N);
 }

@@ -1,4 +1,4 @@
 #include "matrix.h"
 
-double **lbg(double **training, int M, int K, int N);
-int *vq(double **codebook, double **dati, int M, int K, int N);
+double **lbg_get_codebook(double **data, int M, int K, int N);
+int *lbg_encode(double **codebook, double **data, int M, int K, int N);
