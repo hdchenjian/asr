@@ -13,19 +13,19 @@
 #define EPSILON 0.0001
 
 /*  Function that calculates the gamma as: gamma_t(i) = { alpha_t(i) * beta_t(i) } / P(O|lambda) */
-void ComputeGamma(HMM *phmm, int T, double **alpha, double **beta, double **gamma)
+void ComputeGamma(HMM *hmm, int T, double **alpha, double **beta, double **gamma)
 {
     for(int t = 1; t <= T; t++) {
     	double sum = 0.0;
-        for(int j = 1; j <= phmm->N; j++) {
+        for(int j = 1; j <= hmm->N; j++) {
             gamma[t][j] = alpha[t][j] * beta[t][j];
             sum += gamma[t][j];
         }
-        for(int i = 1; i <= phmm->N; i++) gamma[t][i] /= sum;
+        for(int i = 1; i <= hmm->N; i++) gamma[t][i] /= sum;
     }
 }
 
-void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double **gamma, int *pniter,
+void BaumWelch(HMM *hmm, int T, int *O, double **alpha, double **beta,	double **gamma, int *pniter,
 		double *plogprobinit, double *plogprobfinal)
 {
 	int	i, j, k;
@@ -38,43 +38,43 @@ void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double *
 	double ***xi, *scale;
 	double delta, logprobprev;
 
-	xi = alloc_3d_matrix(T, phmm->N);
+	xi = alloc_3d_matrix(T, hmm->N);
 	scale = dvector(1, T);
 
-	ForwardWithScale(phmm, T, O, alpha, scale, &logprobf);
+	ForwardWithScale(hmm, T, O, alpha, scale, &logprobf);
 	*plogprobinit = logprobf; /* log P(O |intial model) */
-	BackwardWithScale(phmm, T, O, beta, scale, &logprobb);
-	ComputeGamma(phmm, T, alpha, beta, gamma);
-	compute_epsilon(phmm, T, O, alpha, beta, xi);
+	BackwardWithScale(hmm, T, O, beta, scale, &logprobb);
+	ComputeGamma(hmm, T, alpha, beta, gamma);
+	compute_epsilon(hmm, T, O, alpha, beta, xi);
 	logprobprev = logprobf;
 
 	do
 	{
         /*  Re-estimates the frequency of the state i over the time t=1 */
         /*  The robability of being in state S_i at time t */
-		for(i = 1; i <= phmm->N; i++)
-			phmm->pi[i] = .001 + .999*gamma[1][i];
+		for(i = 1; i <= hmm->N; i++)
+			hmm->pi[i] = .001 + .999*gamma[1][i];
 
         /*  Re-estimating the transition probability matrix and the different
             observation symbols per state */
 
-		for(i = 1; i <= phmm->N; i++)
+		for(i = 1; i <= hmm->N; i++)
 		{   /*  a^_ij = sum xi_t(i,j) / sum gamma_t(i) */
 			denominatorA = 0.0;
 			for(t = 1; t <= T - 1; t++)
 				denominatorA += gamma[t][i];
 
-			for(j = 1; j <= phmm->N; j++)
+			for(j = 1; j <= hmm->N; j++)
 			{
 				numeratorA = 0.0;
 				for(t = 1; t <= T - 1; t++)
 					numeratorA += xi[t][i][j];
-				phmm->A[i][j] = .001 + .999*numeratorA/denominatorA;
+				hmm->A[i][j] = .001 + .999*numeratorA/denominatorA;
 			}
 
             /*  b^_j(k) = sum gamma_t(j) / sum gamma_t(j) */
 			denominatorB = denominatorA + gamma[T][i];
-			for(k = 1; k <= phmm->M; k++)
+			for(k = 1; k <= hmm->M; k++)
 			{
 				numeratorB = 0.0;
 				for(t = 1; t <= T; t++)
@@ -82,14 +82,14 @@ void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double *
 					if (O[t] == k)
 						numeratorB += gamma[t][i];
 				}
-				phmm->B[i][k] = .001 + .999*numeratorB/denominatorB;
+				hmm->B[i][k] = .001 + .999*numeratorB/denominatorB;
 			}
 		}
 
-		ForwardWithScale(phmm, T, O, alpha, scale, &logprobf);
-		BackwardWithScale(phmm, T, O, beta, scale, &logprobb);
-		ComputeGamma(phmm, T, alpha, beta, gamma);
-		compute_epsilon(phmm, T, O, alpha, beta, xi);
+		ForwardWithScale(hmm, T, O, alpha, scale, &logprobf);
+		BackwardWithScale(hmm, T, O, beta, scale, &logprobb);
+		ComputeGamma(hmm, T, alpha, beta, gamma);
+		compute_epsilon(hmm, T, O, alpha, beta, xi);
 
         /*  Calculates the difference between the logarithmic probability
             of two iterations, the current and the previous */
@@ -103,23 +103,23 @@ void BaumWelch(HMM *phmm, int T, int *O, double **alpha, double **beta,	double *
 	*pniter = l;
 	/*  log P(O|estimated models) */
 	*plogprobfinal = logprobf;
-	free_3d_matrix(xi, T, phmm->N);
+	free_3d_matrix(xi, T, hmm->N);
 	free_dvector(scale, 1, T);
 }
 
 /*  Function that calculates the xi as: xi_t(i,j) = { alpha_t(i) * beta_t+1(j) * a_ij * b_j } / P(O|lambda) */
-void compute_epsilon(HMM* phmm, int T, int *O, double **alpha, double **beta, double ***xi)
+void compute_epsilon(HMM* hmm, int T, int *O, double **alpha, double **beta, double ***xi)
 {
 	for(int t = 1; t <= T - 1; t++) {
 		double sum = 0.0;
-		for(int i = 1; i <= phmm->N; i++){
-			for(int j = 1; j <= phmm->N; j++) {
-				xi[t][i][j] = alpha[t][i] * beta[t+1][j] * phmm->A[i][j] * phmm->B[j][O[t]];
+		for(int i = 1; i <= hmm->N; i++){
+			for(int j = 1; j <= hmm->N; j++) {
+				xi[t][i][j] = alpha[t][i] * beta[t+1][j] * hmm->A[i][j] * hmm->B[j][O[t]];
 				sum += xi[t][i][j];
 			}
 		}
-		for(int i = 1; i <= phmm->N; i++) {
-			for(int j = 1; j <= phmm->N; j++) {
+		for(int i = 1; i <= hmm->N; i++) {
+			for(int j = 1; j <= hmm->N; j++) {
 				xi[t][i][j] /= sum;
 			}
 		}

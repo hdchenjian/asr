@@ -1,6 +1,7 @@
 #include <math.h>
 #include <float.h>
 
+#include "matrix.h"
 #include "lbg_vq.h"
 
 /* training M * k, output: N * K, N is the desired number of codevectors that has the dimension K  */
@@ -80,6 +81,7 @@ double **lbg_get_codebook(double **data, int M, int K, int N)
         }
     }
     free(category_num);
+    free_matrix_double(codebook_previous, N);
     return codebook;
 }
 

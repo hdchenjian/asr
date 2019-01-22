@@ -1,6 +1,60 @@
+#include <string.h>
+
 #include "mfcc.h"
 
-double *open_wav(char *file_name, int *sample_rate, int *frame_num)
+typedef struct {
+    char chunkID[4];            // 1-4      "RIFF"
+    int32_t chunkSize;          // 5-8
+    char format[4];             // 9-12     "WAVE"
+    char subchunkID[4];         // 13-16    "fmt\0"
+    int32_t subchunkSize;       // 17-20
+    uint16_t audioFormat;       // 21-22    PCM = 1
+    uint16_t numChannels;       // 23-24
+    int32_t sampleRate;         // 25-28
+    int32_t bytesPerSecond;     // 29-32
+    uint16_t blockAlign;        // 33-34
+    uint16_t bitDepth;          // 35-36    16bit support only
+    char dataID[4];             // 37-40    "data"
+    int32_t dataSize;           // 41-44
+} WaveHeader;
+
+WaveData wavRead(char fileName[], size_t fileNameSize)
+{
+    if (fileName[fileNameSize] != '\0') {
+        fprintf(stderr, "wavRead: Invalid fileName: %s.\n", fileName);
+        exit(-1);
+    }
+    FILE* filePtr = fopen(fileName, "r");
+    if (filePtr == NULL) {
+        fprintf(stderr, "unable to open file: %s.\n", fileName);
+        exit(-1);
+    }
+    WaveHeader header;
+    fread(&header, sizeof(header), 1, filePtr);
+    if(strncmp(header.chunkID, "RIFF", 4) || strncmp(header.format,"WAVE", 4)||
+       strncmp(header.subchunkID, "fmt", 3) || strncmp(header.dataID,"data", 4) ||
+       header.audioFormat != 1 || header.bitDepth != 16) {
+        fprintf(stderr, "Unsupported file type.\n");
+        fclose(filePtr);
+        exit(-1);
+    }
+    WaveData data;
+    data.sampleRate = header.sampleRate;
+    data.size = header.dataSize;
+    data.data = (int16_t*)malloc(header.dataSize * sizeof(int16_t));
+    fread(data.data, sizeof(float), header.dataSize, filePtr);
+    fclose(filePtr);
+    return data;
+}
+
+typedef struct
+{
+  SNDFILE *audio;
+  SF_INFO info;
+  char *file_name;
+}data_audio;
+
+double *open_wav(char *file_name, int *sample_rate, int *audio_frame)
 {
     data_audio *audio_data = (data_audio*)malloc(sizeof(data_audio));
     audio_data->file_name = file_name;
@@ -10,60 +64,104 @@ double *open_wav(char *file_name, int *sample_rate, int *frame_num)
         exit(-1);
     }
 
-    *frame_num = audio_data->info.frames * audio_data->info.channels;
-    int *audio_data_point = array_int(*frame_num);
+    *audio_frame = audio_data->info.frames * audio_data->info.channels;
+    int *audio_data_point = (int *)calloc(*audio_frame, sizeof(int));
     /*  Read the integer type samples by placing them in the array, */
-    sf_readf_int(audio_data->audio, audio_data_point, *frame_num);
+    sf_readf_int(audio_data->audio, audio_data_point, *audio_frame);
+    for(int i = 0; i < 120; i++) printf("%d %s %d\n", i, file_name, audio_data_point[i]);
     /*  Maximum values (signed or unsigned) representable by an int (4 bytes) */
-    double *val_n = array_double(*frame_num);
+    double *val_n = (double *)calloc(*audio_frame, sizeof(double));
     *sample_rate = audio_data->info.samplerate;
     sf_close(audio_data->audio);
 
-    /*  CALCULATION OF VALUES OF NORMALISED SIGNAL  */
-    //int val_max_n = 0, val_min_n = 0;
-    double int_max = pow(2, 31) - 1;
-    for(int i = 0; i < *frame_num; i++) {
+    for(int i = 0; i < *audio_frame; i++) {
         //if(audio_data_point[i] > val_max_n) val_max_n = audio_data_point[i];
         //if(audio_data_point[i] < val_min_n) val_min_n = audio_data_point[i];
-        val_n[i] = audio_data_point[i] / int_max;
+        val_n[i] = audio_data_point[i]; // / int_max;
     }
-    //printf("val_max_n, val_min_n %d %d\n", val_max_n, val_min_n);
+    free(audio_data);
+    free(audio_data_point);
     return val_n;
 }
 
-double **extract_mfcc(double *segnale, int frequenza_campionamento, int campioni_segnale, int freq_max,
-		int dim_finestra, int dim_passo, int n_coeff_cepstrali, int *n_fin)
+double **merge_feature(int frame_num, int n_coeff, double **mfcc, double **delta, double **delta_delta)
 {
-    /*  CALCULATION OF PRE-EMPHASIS  */
-    double *val_n_p=NULL;
+    double **y = matrix_double(frame_num, 3*n_coeff);
+    for(int n=0; n<frame_num; n++) {
+        for(int m=0; m<n_coeff; m++) {
+            y[n][m] = mfcc[n][m];
+            y[n][m+n_coeff] = delta[n][m];
+            y[n][m+2*n_coeff] = delta_delta[n][m];
+        }
+    }
+    return y;
+}
 
-    val_n_p=pre_enfasi(segnale, campioni_segnale, 0.97);
+/*  Function that calculates the pre-emphasis, Filter:H(z) = 1-a*z^(-1) */
+void pre_emphasize(int16_t *input, double *output, int length, double alpha)
+{
+    /*  From the second, it is possible to apply the pre-emphasis */
+	output[0] = input [0];
+    for(int i = 1; i < length; i++) output[i] = input[i] - alpha * input[i - 1];
+}
+
+double **make_frames_hamming(double *x, int audio_data_num, int sample_rate, int frame_length,
+		int frame_shift, int *sample_per_window_ret, int *frame_num_ret)
+{
+    int i,n,m;
+    /* how many samples are in a window */
+    int sample_per_window = floor( (float)sample_rate * frame_length / 1000);
+    *sample_per_window_ret = sample_per_window;
+    int campioni_passo = floor( (float)sample_rate * frame_shift / 1000 );
+
+    /*  Determine the number of windows that will be in the signal */
+    int frame_num = floor( (float)(audio_data_num - sample_per_window) / campioni_passo );
+    *frame_num_ret = frame_num;
+
+    /*  Determine the displacement vector that contains the sample number from which start the window */
+    int *spiazzamento = calloc(frame_num, sizeof(int));
+
+    for(i=0; i<frame_num; i++)
+        spiazzamento[i] = i*campioni_passo;
+
+    double *hann = (double *)calloc(sample_per_window, sizeof(double));
+    for(i=0; i<sample_per_window; i++)
+        hann[i] = 0.5*(1-cos( (2*M_PI*i) / (sample_per_window-1) ));
+
+    /*  Prepare the matrix that contains the data for each window */
+    double **y = matrix_double(frame_num, sample_per_window);
+
+    /*  Multiply the data for the used window */
+    for(n=0; n<frame_num ; n++ )
+        for(m=0; m<sample_per_window; m++)
+            y[n][m] = x[spiazzamento[n] + m ] * hann[m];
+    return y;
+}
+
+double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, int freq_max,
+		int frame_length, int frame_shift, int coeff_num, int *frame_num)
+{
+	double *data = (double *)malloc(audio_data_num * sizeof(double));
+    pre_emphasize(audio_data, data, audio_data_num, 0.97);
+    for(int i = 0; i < 3; i++) printf("%d %d %f\n", audio_data_num, i, data[i]);
 
     /*  DIVISION SIGNAL IN WINDOWS  */
     double **dati_finestra = NULL;
-    int campioni_finestra, campioni_passo, n_finestre;
+    int sample_per_window;
 
-    dati_finestra = preleva_dati_finestra(val_n_p, campioni_segnale, frequenza_campionamento, dim_finestra,
-    		dim_passo, &campioni_finestra, &campioni_passo, &n_finestre);
-    *n_fin = n_finestre;
+    dati_finestra = make_frames_hamming(data, audio_data_num, sample_rate, frame_length,
+    		frame_shift, &sample_per_window, frame_num);
 
-    /* *************************** */
     /*  SHORT-TIME AVERAGE ENERGY  */
-    /* *************************** */
-
     /*  Determine the Short-Time Average Energy, that is, the average energy relative to a window of a certain number of seconds. */
     /*  Calculates the logarithmic energy of the audio signal */
     double *energia_log=NULL;
-    energia_log = en_log(dati_finestra, n_finestre, campioni_finestra);
-
-    /* ************************ */
-    /*  FAST FOURIER TRANSFORM  */
-    /* ************************ */
+    energia_log = en_log(dati_finestra, *frame_num, sample_per_window);
 
     double **dati_fft = NULL;
     int n_frequenze;
     double frequenza_passo;
-    dati_fft = fft(dati_finestra, n_finestre, campioni_finestra, frequenza_campionamento, freq_max, &n_frequenze, &frequenza_passo);
+    dati_fft = fft(dati_finestra, *frame_num, sample_per_window, sample_rate, freq_max, &n_frequenze, &frequenza_passo);
 
     /* ******************************* */
     /*  BENCH OF FILTERS ON SCALE MEL  */
@@ -80,7 +178,7 @@ double **extract_mfcc(double *segnale, int frequenza_campionamento, int campioni
 
     double **cepstrali = NULL;
 
-    cepstrali=mfcc(dati_fft, n_finestre, n_frequenze, campioni_finestra, n_filtri, banco_filtri_mel ,n_coeff_cepstrali, energia_log);
+    cepstrali=mfcc(dati_fft, *frame_num, n_frequenze, sample_per_window, n_filtri, banco_filtri_mel ,coeff_num, energia_log);
 
     /* ******************** */
     /*  DELTA COEFFICIENTS  */
@@ -89,15 +187,15 @@ double **extract_mfcc(double *segnale, int frequenza_campionamento, int campioni
     double **delta=NULL;
     /*  The Delta coefficients represent the features changes over time.
        As coefficient 0 has been inserted the logarithmic energy. */
-    delta=regressione_lineare(cepstrali, n_finestre, n_coeff_cepstrali);
+    delta=regressione_lineare(cepstrali, *frame_num, coeff_num);
 
     /* *************************** */
     /*  DOUBLE-DELTA COEFFICIENTS  */
     /* *************************** */
 
-    double **doppio_delta=NULL;
+    double **delta_delta=NULL;
     /*  The Double-Delta coefficients represent the features of the variation speed in time. */
-    doppio_delta=regressione_lineare(delta, n_finestre, n_coeff_cepstrali);
+    delta_delta=regressione_lineare(delta, *frame_num, coeff_num);
 
     /* ******************** */
     /*  EXTRACTED FEATURES  */
@@ -105,80 +203,15 @@ double **extract_mfcc(double *segnale, int frequenza_campionamento, int campioni
 
     double **caratteristiche=NULL;
 
-    caratteristiche = estrai_caratteristiche(n_finestre, n_coeff_cepstrali, cepstrali, delta, doppio_delta);
+    caratteristiche = merge_feature(*frame_num, coeff_num, cepstrali, delta, delta_delta);
 
     return caratteristiche;
 }
 
-/*  Function that prints on the screen the audio file information */
-void print_audio_info(data_audio *dato)
-{
-    printf("print_audio_info: file name %s\n", dato->file_name);
-    printf("frames: %ld samplerate: %d, frames / samplerate: %f, channels: %d, formato : %d, sections: %d, Seekable: %d\n",
-           dato->info.frames, dato->info.samplerate, (float)dato->info.frames / dato->info.samplerate,
-		   dato->info.channels, dato->info.format, dato->info.sections, dato->info.seekable);
-}
 
-/*  Function that calculates the pre-emphasis  */
-double *pre_enfasi(double *x, int campioni_segnale, double alpha)
-{
-    int i;
-    double *y = array_double(campioni_segnale);
-
-    /*  The first value is equal to that of the signal */
-    y[0]=x[0];
-
-    /*  From the second, it is possible to apply the pre-emphasis */
-    for(i=1; i<campioni_segnale; i++)
-        y[i]=x[i]-alpha*x[i-1];
-
-    return y;
-}
-
-/*  Function that selects the window containing the signal data */
-double **preleva_dati_finestra(double x[], int campioni_segnale, int freq_camp, int dim_finestra, int dim_passo, int *camp_fin, int *camp_passo, int *n_fin)
-{
-    int i,n,m;
-
-    /*  Determine how many samples are in a window */
-    int campioni_finestra = floor( (float)freq_camp * dim_finestra/1000);
-    *camp_fin = campioni_finestra;
-
-    /*  Determine how many samples are in a step */
-        /*  ceil approximates by excess
-            floor approximates by defect */
-    int campioni_passo = floor( (float)freq_camp * dim_passo/1000 );
-    *camp_passo = campioni_passo;
-
-    /*  Determine the number of windows that will be in the signal */
-    int n_finestre = floor( (float)(campioni_segnale - campioni_finestra)/campioni_passo );
-    *n_fin = n_finestre;
-
-    /*  Determine the displacement vector that contains the sample number from which start the window */
-    int *spiazzamento=array_int(n_finestre);
-
-    for(i=0; i<n_finestre; i++)
-        spiazzamento[i] = i*campioni_passo;
-
-    /*  Prepare the Hann window */
-    double *hann=array_double(campioni_finestra);
-    for(i=0; i<campioni_finestra; i++)
-        hann[i] = 0.5*(1-cos( (2*M_PI*i) / (campioni_finestra-1) ));
-
-    /*  Prepare the matrix that contains the data for each window */
-    double **y = matrix_double(n_finestre, campioni_finestra);
-
-    /*  Multiply the data for the used window */
-    for(n=0; n<n_finestre ; n++ )
-        for(m=0; m<campioni_finestra; m++)
-            y[n][m]=x[ spiazzamento[n] + m ] * hann[m];
-
-    /*  Return the double pointer memory address */
-    return y;
-}
 
 /*  Function that computes the Fast Fourier Transform */
-double **fft(double **x, int n_finestre, int campioni_finestra, int frequenza_campionamento, int freq_max, int *n_freq, double *freq_passo)
+double **fft(double **x, int frame_num, int campioni_finestra, int frequenza_campionamento, int freq_max, int *n_freq, double *freq_passo)
 {
     int i,n,m;
 
@@ -208,14 +241,14 @@ double **fft(double **x, int n_finestre, int campioni_finestra, int frequenza_ca
     int n_frequenze = ceil( freq_max/frequenza_passo );
     *n_freq = n_frequenze;
 
-    in = fftw_malloc ( sizeof ( double ) * n_fft * n_finestre);
-    out = (fftw_complex*) fftw_malloc ( sizeof ( fftw_complex ) * nc * n_finestre);
+    in = fftw_malloc ( sizeof ( double ) * n_fft * frame_num);
+    out = (fftw_complex*) fftw_malloc ( sizeof ( fftw_complex ) * nc * frame_num);
 
     /*  Prepare the vector to be processed
        Because the algorithm accepts a vector instead of a matrix,
        it is necessary to put the rows side by side. */
-    for(i=0; i<(n_finestre*n_fft); )
-        for(n=0; n<n_finestre; n++)
+    for(i=0; i<(frame_num*n_fft); )
+        for(n=0; n<frame_num; n++)
             for(m=0; m<n_fft; m++)
             {
                 if(m < campioni_finestra)
@@ -236,26 +269,26 @@ double **fft(double **x, int n_finestre, int campioni_finestra, int frequenza_ca
        fftw_plan_dft_r2c_2d(int n0, n1 int, double *in, fftw_complex *out, unsigned flags);
        where n0 is the number of rows and n1 that of the columns of the matrix,
        the variable flags can be FFTW_ESTIMATE or FFTW_MEASURE */
-    p = fftw_plan_dft_r2c_2d( n_finestre, n_fft, in, out, FFTW_ESTIMATE );
+    p = fftw_plan_dft_r2c_2d( frame_num, n_fft, in, out, FFTW_ESTIMATE );
     /*  After creating the plan this function is performed to compute the FFT.
        It will get the vector output with the values of the transformed. */
     fftw_execute ( p );
 
     /*  Fetch the real and imaginary values of the Fourier transform, and then
        inserts in a matrix that facilitates the understanding of the algorithm. */
-    double complex *Y[n_finestre];
+    double complex *Y[frame_num];
     double absY_max=0;
 
-    double **absY = (double **)malloc( sizeof(double *) * n_finestre );
+    double **absY = (double **)malloc( sizeof(double *) * frame_num );
 
-    for(n=0; n<n_finestre; n++)
+    for(n=0; n<frame_num; n++)
     {
         Y[n] = malloc ( sizeof (double complex) * n_frequenze );
         absY[n] = (double *)malloc ( sizeof (double) * n_frequenze );
     }
 
     /*  The values of the FFT have as unit of measurement Pa/Hz */
-    for(n=0; n<n_finestre; n++)
+    for(n=0; n<frame_num; n++)
     {
         /*  Fetch up to a frequency that interests,
             to pick up all the calculated frequency it is necessary to put nc instead n_frequency. */
@@ -373,18 +406,18 @@ double **filtri_mel(int n_filtri, int n_frequenze, int freq_max, double frequenz
 }
 
 /*  Function that determines the mel-frequency cepstral coefficients */
-double **mfcc(double **absX, int n_finestre, int n_frequenze, int campioni_finestra, int n_filtri, double **banco_filtri, int n_coeff_cepstrali, double *energia_log)
+double **mfcc(double **absX, int frame_num, int n_frequenze, int campioni_finestra, int n_filtri, double **banco_filtri, int n_coeff_cepstrali, double *energia_log)
 {
     int n,m,i;
-    double **y_mel = matrix_double(n_finestre, n_filtri);
-    double **y_log = matrix_double(n_finestre, n_filtri);
-    double **y = matrix_double(n_finestre, n_coeff_cepstrali);
+    double **y_mel = matrix_double(frame_num, n_filtri);
+    double **y_log = matrix_double(frame_num, n_filtri);
+    double **y = matrix_double(frame_num, n_coeff_cepstrali);
 
     /*  Apply the triangular filter */
-    y_mel = gemm(absX, n_finestre, n_frequenze, banco_filtri, n_filtri);
+    y_mel = gemm(absX, frame_num, n_frequenze, banco_filtri, n_filtri);
 
     /*  Calculate the spectral energy density */
-    for(n=0; n<n_finestre; n++)
+    for(n=0; n<frame_num; n++)
         for(m=0; m<n_filtri; m++)
             y_log[n][m] = log10(pow(y_mel[n][m],2));
 
@@ -395,11 +428,11 @@ double **mfcc(double **absX, int n_finestre, int n_frequenze, int campioni_fines
 
     int n_dct = pow(2, ceil(log2(n_filtri)));
 
-    in = fftw_malloc ( sizeof ( double ) * n_finestre * n_dct);
-    out = fftw_malloc ( sizeof ( double ) * n_finestre * n_dct);
+    in = fftw_malloc ( sizeof ( double ) * frame_num * n_dct);
+    out = fftw_malloc ( sizeof ( double ) * frame_num * n_dct);
 
-    for(i=0; i<(n_finestre*n_dct); )
-        for(n=0; n<n_finestre; n++)
+    for(i=0; i<(frame_num*n_dct); )
+        for(n=0; n<frame_num; n++)
             for(m=0; m<n_dct; m++)
             {
                 if(m < n_filtri)
@@ -415,11 +448,11 @@ double **mfcc(double **absX, int n_finestre, int n_frequenze, int campioni_fines
                 }
             }
 
-    p = fftw_plan_r2r_2d(n_finestre, n_dct, in, out, FFTW_REDFT10, FFTW_REDFT10, FFTW_ESTIMATE);
+    p = fftw_plan_r2r_2d(frame_num, n_dct, in, out, FFTW_REDFT10, FFTW_REDFT10, FFTW_ESTIMATE);
 
     fftw_execute ( p );
 
-    for(n=0; n<n_finestre; n++)
+    for(n=0; n<frame_num; n++)
         for(m=0; m<n_coeff_cepstrali; m++)
         {
             if(m==0)
@@ -439,12 +472,12 @@ double **mfcc(double **absX, int n_finestre, int n_frequenze, int campioni_fines
 }
 
 /*  Function that calculates the logarithmic energy */
-double *en_log(double **x, int n_finestre, int campioni_finestra)
+double *en_log(double **x, int frame_num, int campioni_finestra)
 {
-    double *E_log = array_double(n_finestre);
+    double *E_log = (double *)calloc(frame_num, sizeof(double));
     int n,m;
 
-    for(n=0; n<n_finestre; n++)
+    for(n=0; n<frame_num; n++)
     {
         /*  It is possible to add directly because the vettore_d function,
             in addition to allocating the vector, initializes the values at zero */
@@ -458,12 +491,12 @@ double *en_log(double **x, int n_finestre, int campioni_finestra)
 }
 
 /*  Function defining the linear regression */
-double **regressione_lineare(double **x, int n_finestre, int n_coeff)
+double **regressione_lineare(double **x, int frame_num, int n_coeff)
 {
-    double **y = matrix_double(n_finestre, n_coeff);
+    double **y = matrix_double(frame_num, n_coeff);
     int n,m;
 
-    for(n=0; n<n_finestre; n++)
+    for(n=0; n<frame_num; n++)
         for(m=0; m<n_coeff; m++)
         {
             if(m!=0 && m!=n_coeff-1)
@@ -473,23 +506,6 @@ double **regressione_lineare(double **x, int n_finestre, int n_coeff)
                 y[n][m] = x[n][m+1] - x[n][m];
             else
                 y[n][m] = x[n][m]-x[n][m-1];
-        }
-
-    return y;
-}
-
-/*  Function that takes the features and insert one after the other */
-double **estrai_caratteristiche(int n_finestre, int n_coeff, double **mfcc, double **delta, double **doppio_delta)
-{
-    int n,m;
-    double **y = matrix_double(n_finestre, 3*n_coeff);
-
-    for(n=0; n<n_finestre; n++)
-        for(m=0; m<n_coeff; m++)
-        {
-            y[n][m] = mfcc[n][m];
-            y[n][m+n_coeff] = delta[n][m];
-            y[n][m+2*n_coeff] = doppio_delta[n][m];
         }
 
     return y;

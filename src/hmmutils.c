@@ -6,105 +6,104 @@
 #include "nrutil.h"
 #include "hmm.h"
 
-void FreeHMM(HMM *phmm)
+void FreeHMM(HMM *hmm)
 {
-	free_dmatrix(phmm->A, 1, phmm->N, 1, phmm->N);
-	free_dmatrix(phmm->B, 1, phmm->N, 1, phmm->M);
-	free_dvector(phmm->pi, 1, phmm->N);
+	free_dmatrix(hmm->A, 1, hmm->N, 1, hmm->N);
+	free_dmatrix(hmm->B, 1, hmm->N, 1, hmm->M);
+	free_dvector(hmm->pi, 1, hmm->N);
 }
 
-void save_hmm(char nome_file[], HMM *phmm)
+void save_hmm(char nome_file[], HMM *hmm)
 {
     FILE *fp = fopen(nome_file,"wb");
-    if(fp==NULL) print_error_exit("Errore di apertura del file.");
+    if(fp == NULL) print_error_exit("Errore di apertura del file.");
     size_t dimensione = sizeof(double);
-    size_t elementi = phmm->N;
+    size_t elementi = hmm->N;
     size_t ritorno;
 
     int i;
-    for(i=1; i<phmm->N; i++) {
-        ritorno = fwrite(phmm->A[i], dimensione, elementi, fp);
-        if (ritorno != elementi)
-            print_error_exit("Errore scrittura su file.");
-    }
-
-    elementi = phmm->M;
-    for(i=1; i<phmm->N; i++) {
-        ritorno = fwrite(phmm->B[i], dimensione, elementi, fp);
+    for(i=1; i<hmm->N; i++) {
+        ritorno = fwrite(hmm->A[i], dimensione, elementi, fp);
         if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
     }
 
-    elementi = phmm->N;
-    ritorno = fwrite(phmm->pi, dimensione, elementi, fp);
+    elementi = hmm->M;
+    for(i=1; i<hmm->N; i++) {
+        ritorno = fwrite(hmm->B[i], dimensione, elementi, fp);
+        if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
+    }
+
+    elementi = hmm->N;
+    ritorno = fwrite(hmm->pi, dimensione, elementi, fp);
     if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
     fclose(fp);
 }
 
 /*  Function that loads a binary file on hidden Markov model */
-void load_hmm(char nome_file[], HMM *phmm, int N, int M)
+void load_hmm(char nome_file[], HMM *hmm, int N, int M)
 {
     int i;
-    phmm->N = N;
-    phmm->M = M;
-    phmm->A = (double **) dmatrix(1, phmm->N, 1, phmm->N);
-    phmm->B = (double **) dmatrix(1, phmm->N, 1, phmm->M);
-    phmm->pi = (double *) dvector(1, phmm->N);
+    hmm->N = N;
+    hmm->M = M;
+    hmm->A = (double **) dmatrix(1, hmm->N, 1, hmm->N);
+    hmm->B = (double **) dmatrix(1, hmm->N, 1, hmm->M);
+    hmm->pi = (double *) dvector(1, hmm->N);
 
     FILE *fp = fopen(nome_file,"rb");
     if(fp==NULL) print_error_exit("Errore di apertura del file.");
 
     size_t dimensione = sizeof(double);
-    size_t elementi = phmm->N;
+    size_t elementi = hmm->N;
     size_t ritorno;
 
-    for(i=1; i<phmm->N; i++) {
-        ritorno = fread(phmm->A[i], dimensione, elementi, fp);
+    for(i=1; i<hmm->N; i++) {
+        ritorno = fread(hmm->A[i], dimensione, elementi, fp);
         if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
     }
 
-    elementi = phmm->M;
-    for(i=1; i<phmm->N; i++) {
-        ritorno = fread(phmm->B[i], dimensione, elementi, fp);
+    elementi = hmm->M;
+    for(i=1; i<hmm->N; i++) {
+        ritorno = fread(hmm->B[i], dimensione, elementi, fp);
         if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
     }
 
-    elementi = phmm->N;
-    ritorno = fread(phmm->pi, dimensione, elementi, fp);
+    elementi = hmm->N;
+    ritorno = fread(hmm->pi, dimensione, elementi, fp);
     if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
     fclose(fp);
 }
 
-void InitHMM_SC1(HMM *phmm, int N, int M, int seed)
+void InitHMM(HMM *hmm, int N, int M, int seed)
 {
 	int i, j, k;
 	double sum;
-	hmmsetseed(seed);
-    phmm->M = M;
-    phmm->N = N;
-    phmm->A = (double **) dmatrix(1, phmm->N, 1, phmm->N);
-    for(i = 1; i <= phmm->N; i++) {
+	srand(seed);
+    hmm->M = M;
+    hmm->N = N;
+    hmm->A = (double **) dmatrix(1, hmm->N, 1, hmm->N);
+    for(i = 1; i <= hmm->N; i++) {
 		sum = 0.0;
-        for(j = 1; j <= phmm->N; j++) {
-            if(j<i || j>=i+3) phmm->A[i][j] = 0.0;
-            else phmm->A[i][j] = hmmgetrand();
-			sum += phmm->A[i][j];
+        for(j = 1; j <= hmm->N; j++) {
+            if(j<i || j>=i+3) hmm->A[i][j] = 0.0;
+            else hmm->A[i][j] = (double)rand() / RAND_MAX;
+			sum += hmm->A[i][j];
 		}
-        for(j = 1; j <= phmm->N; j++) phmm->A[i][j] /= sum;
+        for(j = 1; j <= hmm->N; j++) hmm->A[i][j] /= sum;
 	}
 
-    phmm->B = (double **) dmatrix(1, phmm->N, 1, phmm->M);
-    for(j = 1; j <= phmm->N; j++) {
+    hmm->B = (double **) dmatrix(1, hmm->N, 1, hmm->M);
+    for(j = 1; j <= hmm->N; j++) {
         sum = 0.0;
-        for(k = 1; k <= phmm->M; k++) {
-            phmm->B[j][k] = hmmgetrand();
-			sum += phmm->B[j][k];
+        for(k = 1; k <= hmm->M; k++) {
+            hmm->B[j][k] = (double)rand() / RAND_MAX;
+			sum += hmm->B[j][k];
 		}
-        for(k = 1; k <= phmm->M; k++) phmm->B[j][k] /= sum;
+        for(k = 1; k <= hmm->M; k++) hmm->B[j][k] /= sum;
 	}
 
-    phmm->pi = (double *) dvector(1, phmm->N);
-    phmm->pi[1] = 1;
-    for(i = 2; i <= phmm->N; i++) {
-        phmm->pi[i] = 0;
+    hmm->pi = (double *) dvector(1, hmm->N);
+    hmm->pi[1] = 1;
+    for(i = 2; i <= hmm->N; i++) {
+        hmm->pi[i] = 0;
 	}
 }

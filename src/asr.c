@@ -18,76 +18,72 @@
   If SET is 2 it compares with words not used in the training contaminated with Gaussian noise
   If SET is 3 it compares with words used in the training contaminated with Gaussian noise */
 
-/*  If SC is 1 it uses the model with serial constraint with single and double transitions
-    If SC is 2 it uses the model with serial constraint with single transitions */
-#define SC 1
-
 int main()
 {
-    list_audio *lista = NULL;
-    lista = add_audio("audio/00_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/00_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/00_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/00_01_pietro.r.wav", lista);
-    lista = add_audio("audio/00_02_pietro.r.wav", lista);
-    lista = add_audio("audio/00_03_pietro.r.wav", lista);
-    lista = add_audio("audio/01_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/01_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/01_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/01_01_pietro.r.wav", lista);
-    lista = add_audio("audio/01_02_pietro.r.wav", lista);
-    lista = add_audio("audio/01_03_pietro.r.wav", lista);
-    lista = add_audio("audio/02_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/02_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/02_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/02_01_pietro.r.wav", lista);
-    lista = add_audio("audio/02_02_pietro.r.wav", lista);
-    lista = add_audio("audio/02_03_pietro.r.wav", lista);
-    lista = add_audio("audio/03_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/03_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/03_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/03_01_pietro.r.wav", lista);
-    lista = add_audio("audio/03_02_pietro.r.wav", lista);
-    lista = add_audio("audio/03_03_pietro.r.wav", lista);
-    lista = add_audio("audio/04_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/04_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/04_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/04_01_pietro.r.wav", lista);
-    lista = add_audio("audio/04_02_pietro.r.wav", lista);
-    lista = add_audio("audio/04_03_pietro.r.wav", lista);
-    lista = add_audio("audio/05_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/05_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/05_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/05_01_pietro.r.wav", lista);
-    lista = add_audio("audio/05_02_pietro.r.wav", lista);
-    lista = add_audio("audio/05_03_pietro.r.wav", lista);
-    lista = add_audio("audio/06_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/06_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/06_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/06_01_pietro.r.wav", lista);
-    lista = add_audio("audio/06_02_pietro.r.wav", lista);
-    lista = add_audio("audio/06_03_pietro.r.wav", lista);
-    lista = add_audio("audio/07_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/07_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/07_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/07_01_pietro.r.wav", lista);
-    lista = add_audio("audio/07_02_pietro.r.wav", lista);
-    lista = add_audio("audio/07_03_pietro.r.wav", lista);
-    lista = add_audio("audio/08_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/08_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/08_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/08_01_pietro.r.wav", lista);
-    lista = add_audio("audio/08_02_pietro.r.wav", lista);
-    lista = add_audio("audio/08_03_pietro.r.wav", lista);
-    lista = add_audio("audio/09_01_giuseppe.s.wav", lista);
-    lista = add_audio("audio/09_02_giuseppe.s.wav", lista);
-    lista = add_audio("audio/09_03_giuseppe.s.wav", lista);
-    lista = add_audio("audio/09_01_pietro.r.wav", lista);
-    lista = add_audio("audio/09_02_pietro.r.wav", lista);
-    lista = add_audio("audio/09_03_pietro.r.wav", lista);
+    list_audio *train_list = 0;
+    add_audio("audio/00_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/00_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/00_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/00_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/00_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/00_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/01_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/01_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/01_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/01_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/01_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/01_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/02_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/02_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/02_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/02_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/02_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/02_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/03_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/03_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/03_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/03_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/03_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/03_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/04_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/04_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/04_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/04_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/04_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/04_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/05_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/05_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/05_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/05_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/05_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/05_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/06_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/06_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/06_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/06_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/06_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/06_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/07_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/07_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/07_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/07_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/07_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/07_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/08_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/08_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/08_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/08_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/08_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/08_03_pietro.r.wav", train_list);
+    train_list = add_audio("audio/09_01_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/09_02_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/09_03_giuseppe.s.wav", train_list);
+    train_list = add_audio("audio/09_01_pietro.r.wav", train_list);
+    train_list = add_audio("audio/09_02_pietro.r.wav", train_list);
+    train_list = add_audio("audio/09_03_pietro.r.wav", train_list);
 
     int frame_num_total = 0;
-    list_audio *current_audio =lista;
+    list_audio *current_audio =train_list;
     int train_num = 0;
     while(current_audio != NULL) {
         frame_num_total += current_audio->frame_num;
@@ -95,27 +91,16 @@ int main()
         train_num += 1;
     }
 
-    int lettere = 128;
-    char **set = (char **)malloc(sizeof(char*) * (train_num + 1));
-    if (set == NULL) print_error_exit("malloc failed");
-    for(int i = 0; i < train_num + 1; i++) {
-        set[i] = (char *)malloc(sizeof(char) * lettere);
-        if (set[i] == NULL) print_error_exit("malloc failed");
-    }
-    int mfcc_coeff_num = N_COEFF_CEP*3;
-
+    int mfcc_coeff_num = MFCC_COEFF_NUM*3;
     double **training = matrix_double(frame_num_total, mfcc_coeff_num);
-    current_audio = lista;
+    current_audio = train_list;
 	int train_set_index = 0, feature_index = 0;
     while(current_audio != NULL) {
-        double **mfcc_feature = matrix_double(current_audio->frame_num, mfcc_coeff_num);
-        load_matrix_double(current_audio->filename_car, mfcc_feature, current_audio->frame_num, mfcc_coeff_num);
         for(int n = 0; n < current_audio->frame_num; n++){
             for(int k=0; k< mfcc_coeff_num; k++) {
-                training[feature_index + n][k] = mfcc_feature[n][k];
+                training[feature_index + n][k] = current_audio->mfcc[n][k];
             }
         }
-        strcpy(set[train_set_index],current_audio->filename);
         //printf("%s, frame_num: %d\n", current_audio->filename, current_audio->frame_num);
         train_set_index += 1;
         feature_index += current_audio->frame_num;
@@ -124,181 +109,135 @@ int main()
     printf("train_num %d, mfcc_coeff_num %d, frame_num_total %d\n", train_num, mfcc_coeff_num, frame_num_total);
 
     double **codebook = lbg_get_codebook(training, frame_num_total, mfcc_coeff_num, VQ_NUM);
+    free_matrix_double(training, frame_num_total);
     printf("lbg_get_codebook, M %d, K %d, N %d\n", frame_num_total, mfcc_coeff_num, VQ_NUM);
-    FILE *codebook_file = fopen("obj/codebook.txt", "w");
-    for(int n = 0; n < VQ_NUM; n++) {
-        fprintf(codebook_file,"%d\n", n);
-        for(int k = 0; k < mfcc_coeff_num; k++) fprintf(codebook_file,"%f\t", codebook[n][k]);
-        fprintf(codebook_file,"\n");
-    }
-    fclose(codebook_file);
 
-    FILE *feature_vq = fopen("obj/feature_vq.txt","w");
-    current_audio = lista;
+    current_audio = train_list;
     while(current_audio != NULL) {
-        double **mfcc_feature = matrix_double(current_audio->frame_num, mfcc_coeff_num);
-        load_matrix_double(current_audio->filename_car, mfcc_feature, current_audio->frame_num, mfcc_coeff_num);
-        /*  The quantized vector is the vector of sequences that will be used in the Hidden Markov Models */
-        int *vq_sequence = lbg_encode(codebook, mfcc_feature, current_audio->frame_num, mfcc_coeff_num, VQ_NUM);
-
-        char *filename_vq = strdup(current_audio->filename);
-        char *pos = strrchr(filename_vq, '.' );
-        int i = pos - filename_vq;
-        filename_vq[i+1] = 's';
-        filename_vq[i+2] = 'e';
-        filename_vq[i+3] = 'q';
-
-        fprintf(feature_vq,"%s\n", current_audio->filename);
-        for(int n = 0; n < current_audio->frame_num; n++) {
-            fprintf(feature_vq, "%d\t", vq_sequence[n]);
-        }
-        fprintf(feature_vq, "\n\n");
-
-        strcpy(current_audio->filename_seq, filename_vq);
-        save_array_int(current_audio->filename_seq, vq_sequence, current_audio->frame_num);
-        free(vq_sequence);
+        int *vq_result = lbg_encode(codebook, current_audio->mfcc, current_audio->frame_num, mfcc_coeff_num, VQ_NUM);
+        current_audio->vq_result = vq_result;
         current_audio = current_audio->next;
     }
-    fclose(feature_vq);
-
 
     HMM hmm;
     int observed_num = VQ_NUM;
     int status_num = 5;
-    double **alpha;
-    double **beta;
-    double **gamma;
-    current_audio = lista;
+    current_audio = train_list;
     while(current_audio != NULL) {
-        char *filename_hmm = strdup(current_audio->filename);
-        char *pos = strrchr(filename_hmm, '.' );
-        int i = pos-filename_hmm;
-        filename_hmm[i+1] = 'h';
-        filename_hmm[i+2] = 'm';
-        filename_hmm[i+3] = 'm';
-        strcpy(current_audio->filename_hmm, filename_hmm);
-        int *observe_sequence = array_int(current_audio->frame_num);
-        load_array_int(current_audio->filename_seq, observe_sequence, current_audio->frame_num);
+        strcpy(current_audio->filename_hmm, current_audio->filename);
+        char *pos = strrchr(current_audio->filename_hmm, '.' );
+        int i = pos - current_audio->filename_hmm;
+        current_audio->filename_hmm[i+1] = 'h';
+        current_audio->filename_hmm[i+2] = 'm';
+        current_audio->filename_hmm[i+3] = 'm';
 
-#if SC==1
-        InitHMM_SC1(&hmm, status_num, observed_num, time(0));
-#elif SC==2
-        InitHMM_SC2(&hmm, status_num, observed_num, time(0));
-#endif
-        alpha = dmatrix(1, current_audio->frame_num, 1, hmm.N);
-        beta = dmatrix(1, current_audio->frame_num, 1, hmm.N);
-        gamma = dmatrix(1, current_audio->frame_num, 1, hmm.N);
-        BaumWelch_C(&hmm, current_audio->frame_num, observe_sequence, alpha, beta, gamma);
+        InitHMM(&hmm, status_num, observed_num, time(0));
+        double **alpha = dmatrix(1, current_audio->frame_num, 1, hmm.N);
+        double **beta = dmatrix(1, current_audio->frame_num, 1, hmm.N);
+        double **gamma = dmatrix(1, current_audio->frame_num, 1, hmm.N);
+        BaumWelch_C(&hmm, current_audio->frame_num, current_audio->vq_result, alpha, beta, gamma);
         save_hmm(current_audio->filename_hmm, &hmm);
+        free_dmatrix(alpha, 1, current_audio->frame_num, 1, hmm.N);
+        free_dmatrix(beta, 1, current_audio->frame_num, 1, hmm.N);
+        free_dmatrix(gamma, 1, current_audio->frame_num, 1, hmm.N);
+        FreeHMM(&hmm);
         current_audio = current_audio->next;
     }
-    return 0;
-    double 	proba[train_num];
-    int	*q;
-    double **delta;
-    int	**psi;
-    int frequenza_campionamento, campioni_segnale, n_finestre;
-    double *segnale = NULL;
-    char **analizza = NULL;
-    int parole  =  40;
-    analizza = (char **) malloc(sizeof(char*) * parole);
-    if (analizza == NULL) print_error_exit("malloc failed");
-    for(int i = 0; i<parole; i++) {
-        analizza[i]  =  (char *) malloc(sizeof(char) * lettere);
-        if (analizza[i]==NULL)
-            print_error_exit("malloc failed");
-    }
+    printf("train hmm over\n");
 
-    analizza[0] = "audio/00_04_giuseppe.s.wav";
-    analizza[1] = "audio/00_05_giuseppe.s.wav";
-    analizza[2] = "audio/00_04_pietro.r.wav";
-    analizza[3] = "audio/00_05_pietro.r.wav";
-    analizza[4] = "audio/01_04_giuseppe.s.wav";
-    analizza[5] = "audio/01_05_giuseppe.s.wav";
-    analizza[6] = "audio/01_04_pietro.r.wav";
-    analizza[7] = "audio/01_05_pietro.r.wav";
-    analizza[8] = "audio/02_04_giuseppe.s.wav";
-    analizza[9] = "audio/02_05_giuseppe.s.wav";
-    analizza[10] = "audio/02_04_pietro.r.wav";
-    analizza[11] = "audio/02_05_pietro.r.wav";
-    analizza[12] = "audio/03_04_giuseppe.s.wav";
-    analizza[13] = "audio/03_05_giuseppe.s.wav";
-    analizza[14] = "audio/03_04_pietro.r.wav";
-    analizza[15] = "audio/03_05_pietro.r.wav";
-    analizza[16] = "audio/04_04_giuseppe.s.wav";
-    analizza[17] = "audio/04_05_giuseppe.s.wav";
-    analizza[18] = "audio/04_04_pietro.r.wav";
-    analizza[19] = "audio/04_05_pietro.r.wav";
-    analizza[20] = "audio/05_04_giuseppe.s.wav";
-    analizza[21] = "audio/05_05_giuseppe.s.wav";
-    analizza[22] = "audio/05_04_pietro.r.wav";
-    analizza[23] = "audio/05_05_pietro.r.wav";
-    analizza[24] = "audio/06_04_giuseppe.s.wav";
-    analizza[25] = "audio/06_05_giuseppe.s.wav";
-    analizza[26] = "audio/06_04_pietro.r.wav";
-    analizza[27] = "audio/06_05_pietro.r.wav";
-    analizza[28] = "audio/07_04_giuseppe.s.wav";
-    analizza[29] = "audio/07_05_giuseppe.s.wav";
-    analizza[30] = "audio/07_04_pietro.r.wav";
-    analizza[31] = "audio/07_05_pietro.r.wav";
-    analizza[32] = "audio/08_04_giuseppe.s.wav";
-    analizza[33] = "audio/08_05_giuseppe.s.wav";
-    analizza[34] = "audio/08_04_pietro.r.wav";
-    analizza[35] = "audio/08_05_pietro.r.wav";
-    analizza[36] = "audio/09_04_giuseppe.s.wav";
-    analizza[37] = "audio/09_05_giuseppe.s.wav";
-    analizza[38] = "audio/09_04_pietro.r.wav";
-    analizza[39] = "audio/09_05_pietro.r.wav";
+    int test_num  =  40;
+    char **test_list = (char **)malloc(sizeof(char*) * test_num);
+    for(int i = 0; i<test_num; i++) test_list[i]  =  (char *)malloc(sizeof(char) * 128);
 
+    test_list[0] = "audio/00_04_giuseppe.s.wav";
+    test_list[1] = "audio/00_05_giuseppe.s.wav";
+    test_list[2] = "audio/00_04_pietro.r.wav";
+    test_list[3] = "audio/00_05_pietro.r.wav";
+    test_list[4] = "audio/01_04_giuseppe.s.wav";
+    test_list[5] = "audio/01_05_giuseppe.s.wav";
+    test_list[6] = "audio/01_04_pietro.r.wav";
+    test_list[7] = "audio/01_05_pietro.r.wav";
+    test_list[8] = "audio/02_04_giuseppe.s.wav";
+    test_list[9] = "audio/02_05_giuseppe.s.wav";
+    test_list[10] = "audio/02_04_pietro.r.wav";
+    test_list[11] = "audio/02_05_pietro.r.wav";
+    test_list[12] = "audio/03_04_giuseppe.s.wav";
+    test_list[13] = "audio/03_05_giuseppe.s.wav";
+    test_list[14] = "audio/03_04_pietro.r.wav";
+    test_list[15] = "audio/03_05_pietro.r.wav";
+    test_list[16] = "audio/04_04_giuseppe.s.wav";
+    test_list[17] = "audio/04_05_giuseppe.s.wav";
+    test_list[18] = "audio/04_04_pietro.r.wav";
+    test_list[19] = "audio/04_05_pietro.r.wav";
+    test_list[20] = "audio/05_04_giuseppe.s.wav";
+    test_list[21] = "audio/05_05_giuseppe.s.wav";
+    test_list[22] = "audio/05_04_pietro.r.wav";
+    test_list[23] = "audio/05_05_pietro.r.wav";
+    test_list[24] = "audio/06_04_giuseppe.s.wav";
+    test_list[25] = "audio/06_05_giuseppe.s.wav";
+    test_list[26] = "audio/06_04_pietro.r.wav";
+    test_list[27] = "audio/06_05_pietro.r.wav";
+    test_list[28] = "audio/07_04_giuseppe.s.wav";
+    test_list[29] = "audio/07_05_giuseppe.s.wav";
+    test_list[30] = "audio/07_04_pietro.r.wav";
+    test_list[31] = "audio/07_05_pietro.r.wav";
+    test_list[32] = "audio/08_04_giuseppe.s.wav";
+    test_list[33] = "audio/08_05_giuseppe.s.wav";
+    test_list[34] = "audio/08_04_pietro.r.wav";
+    test_list[35] = "audio/08_05_pietro.r.wav";
+    test_list[36] = "audio/09_04_giuseppe.s.wav";
+    test_list[37] = "audio/09_05_giuseppe.s.wav";
+    test_list[38] = "audio/09_04_pietro.r.wav";
+    test_list[39] = "audio/09_05_pietro.r.wav";
 
-    FILE *risultati = fopen("risultati.txt","w");
-    for(int j = 0; j<parole; j++) {
-        current_audio = lista;
+    double probability[train_num];
+    for(int j = 0; j < test_num; j++) {
+        current_audio = train_list;
+        int sample_rate = 0;
+        int audio_data_num = 0;
+        int frame_num = 0;
+        double *signal = open_wav(test_list[j], &sample_rate, &audio_data_num);
+        double **mfcc_feature = extract_mfcc(signal, sample_rate, audio_data_num,
+        		FREQUENZA_MAX, FRAME_LENGTH, FRAME_SHIFT, MFCC_COEFF_NUM, &frame_num);
+        free(signal);
+        int *audio_vq = lbg_encode(codebook, mfcc_feature, frame_num, mfcc_coeff_num, VQ_NUM);
+        //printf("audio_vq %p\n", audio_vq);
 
-        frequenza_campionamento = campioni_segnale = n_finestre = 0;
+        free_matrix_double(mfcc_feature, frame_num);
+        printf("test %s\n", test_list[j]);
 
-        segnale = open_wav(analizza[j], &frequenza_campionamento, &campioni_segnale);
-        double **mfcc_feature = extract_mfcc(segnale, frequenza_campionamento, campioni_segnale,
-        		FREQUENZA_MAX, DIM_FINESTRA, DIM_PASSO, N_COEFF_CEP, &n_finestre);
-
-        int *sequenza = lbg_encode(codebook, mfcc_feature, n_finestre, mfcc_coeff_num, VQ_NUM);
-
-        int T = n_finestre;
-
-        q = ivector(1,T);
-        delta = dmatrix(1, T, 1, status_num);
-        psi = imatrix(1, T, 1, status_num);
-
-        int i = 0;
-        while(current_audio != NULL)
-        {
-            proba[i] = 0;
+        int index = 0;
+        int	*path = (int *)calloc(frame_num, sizeof(int));
+        while(current_audio != NULL) {
             load_hmm(current_audio->filename_hmm, &hmm, status_num, observed_num);
-
-            ViterbiLog_C(&hmm, T, sequenza, delta, psi, q, &proba[i]);
-
-            i++;
+            Viterbi(&hmm, frame_num, audio_vq, path, &probability[index]);
+            index++;
             current_audio = current_audio->next;
         }
+        free(path);
+        //printf("audio_vq %p\n", audio_vq);
+        free(audio_vq);
 
-        double alt_proba;
-        double basso_proba;
-        int val_alto, val_basso;
 
-        alt_proba = basso_proba = proba[0];
-        val_alto = val_basso = 0;
-
-        for(i = 0; i<train_num; i++) {
-            if(proba[i]>alt_proba) {
-                alt_proba = proba[i];
-                val_alto = i;
+        double max_prob = -1;
+        double min_prob = -1;
+        int max_index, min_index;
+        max_index = - 1;
+        min_index = -1;
+        for(int i = 0; i < train_num; i++) {
+            if(probability[i] > max_prob) {
+                max_prob = probability[i];
+                max_index = i;
             }
-            if(proba[i]<basso_proba) {
-                basso_proba = proba[i];
-                val_basso = i;
+            if(probability[i] < min_prob) {
+                min_prob = probability[i];
+                min_index = i;
             }
         }
-        fprintf(risultati,"%s\tlo associo a\t%s\n", analizza[j], set[val_alto]);
+        printf("%s %d %d\n", test_list[j], max_index, min_index);
     }
+    for(int i = 0; i<test_num; i++) free(test_list[i]);
+    free(test_list);
+    free_matrix_double(codebook, VQ_NUM);
     return 0;
 }
