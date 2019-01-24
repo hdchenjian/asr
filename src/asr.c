@@ -8,9 +8,7 @@
 #include "lbg_vq.h"
 
 /*  Number of codevectors, allowed only power of 2 */
-//#define NVQ 32
 #define VQ_NUM 64
-//#define NVQ 128
 
 /*
   If SET is 0 it compares with words not used in the training
@@ -81,6 +79,7 @@ int main()
     train_list = add_audio("audio/09_01_pietro.r.wav", train_list);
     train_list = add_audio("audio/09_02_pietro.r.wav", train_list);
     train_list = add_audio("audio/09_03_pietro.r.wav", train_list);
+    printf("load train data over\n");
 
     int frame_num_total = 0;
     list_audio *current_audio =train_list;
@@ -98,7 +97,7 @@ int main()
     while(current_audio != NULL) {
         for(int n = 0; n < current_audio->frame_num; n++){
             for(int k=0; k< mfcc_coeff_num; k++) {
-                training[feature_index + n][k] = current_audio->mfcc[n][k];
+                training[feature_index + n][k] = current_audio->feature[n][k];
             }
         }
         //printf("%s, frame_num: %d\n", current_audio->filename, current_audio->frame_num);
@@ -114,7 +113,7 @@ int main()
 
     current_audio = train_list;
     while(current_audio != NULL) {
-        int *vq_result = lbg_encode(codebook, current_audio->mfcc, current_audio->frame_num, mfcc_coeff_num, VQ_NUM);
+        int *vq_result = lbg_encode(codebook, current_audio->feature, current_audio->frame_num, mfcc_coeff_num, VQ_NUM);
         current_audio->vq_result = vq_result;
         current_audio = current_audio->next;
     }
@@ -193,17 +192,13 @@ int main()
     double probability[train_num];
     for(int j = 0; j < test_num; j++) {
         current_audio = train_list;
-        int sample_rate = 0;
-        int audio_data_num = 0;
         int frame_num = 0;
-        double *signal = open_wav(test_list[j], &sample_rate, &audio_data_num);
-        double **mfcc_feature = extract_mfcc(signal, sample_rate, audio_data_num,
-        		FREQUENZA_MAX, FRAME_LENGTH, FRAME_SHIFT, MFCC_COEFF_NUM, &frame_num);
-        free(signal);
-        int *audio_vq = lbg_encode(codebook, mfcc_feature, frame_num, mfcc_coeff_num, VQ_NUM);
-        //printf("audio_vq %p\n", audio_vq);
+        WaveData data = wavRead(test_list[j], strlen(test_list[j]));
+        double **feature = extract_mfcc(data.data, data.sampleRate, data.size, &frame_num);
+        free(data.data);
+        int *audio_vq = lbg_encode(codebook, feature, frame_num, mfcc_coeff_num, VQ_NUM);
 
-        free_matrix_double(mfcc_feature, frame_num);
+        free_matrix_double(feature, frame_num);
         printf("test %s\n", test_list[j]);
 
         int index = 0;

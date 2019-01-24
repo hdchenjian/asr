@@ -15,10 +15,8 @@ void free_matrix_double(double **m, int row)
 double **matrix_double(int row, int column)
 {
 	double **m = (double **) malloc(sizeof(double*) * row);
-	if (m==NULL) print_error_exit("malloc failed");
 	for(int i = 0; i< row; i++) {
 		m[i] = (double *)calloc(column, sizeof(double));
-		if (m[i]==NULL) print_error_exit("malloc failed");
 	}
 	return m;
 }
@@ -26,10 +24,8 @@ double **matrix_double(int row, int column)
 int **matrice_i(int row, int column)
 {
 	int **m = (int **) malloc(sizeof(int*) * row);
-	if (m==NULL) print_error_exit("malloc failed");
 	for(int i=0; i<row; i++) {
 		m[i] = (int *)calloc(column, sizeof(int));
-		if (m[i]==NULL) print_error_exit("malloc failed");
 	}
 	return m;
 }
@@ -61,52 +57,3 @@ double **gemm(double **A, int row_A, int column_A, double **B, int column_B)
     return C;
 }
 
-void save_matrix_double(char nome_file[], double **dati, int row, int column)
-{
-    FILE *fp = fopen(nome_file,"wb") ;
-    if(fp==NULL) print_error_exit("open file failed.");
-    size_t dimensione = sizeof(double);
-    size_t elementi = column ;
-    size_t ritorno;
-    for(int i=0; i<row; i++) {
-        ritorno = fwrite(dati[i], dimensione, elementi, fp);
-        if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
-    }
-    fclose(fp);
-}
-
-void load_matrix_double(char nome_file[], double **dati, int row, int column)
-{
-    FILE *fp = fopen(nome_file,"rb") ;
-    if(fp==NULL) print_error_exit("Errore di apertura del file.");
-    size_t dimensione = sizeof(double);
-    size_t elementi = column ;
-    size_t ritorno;
-    for(int i=0; i < row; i++) {
-        ritorno = fread(dati[i], dimensione, elementi, fp);
-        if (ritorno != column) print_error_exit("Errore scrittura su file.");
-    }
-    fclose(fp);
-}
-
-void save_array_int(char nome_file[], int *dati, int elementi)
-{
-    FILE *fp =fopen(nome_file,"wb") ;
-    if(fp==NULL) print_error_exit("Errore di apertura del file.");
-    size_t dimensione = sizeof(int);
-    size_t ritorno;
-    ritorno = fwrite(dati, dimensione, elementi, fp);
-    if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
-    fclose(fp);
-}
-
-void load_array_int(char nome_file[], int *dati, int elementi)
-{
-    FILE *fp = fopen(nome_file,"rb") ;
-    if(fp==NULL) print_error_exit("Errore di apertura del file.");
-    size_t dimensione = sizeof(int);
-    size_t ritorno;
-    ritorno = fread(dati, dimensione, elementi, fp);
-    if (ritorno != elementi) print_error_exit("Errore scrittura su file.");
-    fclose(fp);
-}
