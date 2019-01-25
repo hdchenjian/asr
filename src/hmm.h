@@ -12,21 +12,5 @@ typedef struct {
 
 void FreeHMM(HMM *hmm);
 void InitHMM(HMM *hmm, int N, int M, int seed);
-void save_hmm(char nome_file[], HMM *hmm);
-void load_hmm(char nome_file[], HMM *hmm, int N, int M);
-
-void Forward(HMM *hmm, int T, int *O, double **alpha, double *pprob);
-void ForwardWithScale(HMM *hmm, int T, int *O, double **alpha, double *scale, double *pprob);
-void Backward(HMM *hmm, int T, int *O, double **beta, double *pprob);
-void BackwardWithScale(HMM *hmm, int T, int *O, double **beta, double *scale, double *pprob);
-void BaumWelch(HMM *hmm, int T, int *O, double **alpha, double **beta,
-               double **gamma, int *niter, double *plogprobinit, double *plogprobfinal);
-void BaumWelch_C(HMM *hmm, int frame_num, int *O, double **alpha, double **beta, double **gamma);
-
-double *** alloc_3d_matrix(int T, int N);
-void free_3d_matrix(double *** xi, int T, int N);
-void ComputeGamma(HMM *hmm, int T, double **alpha, double **beta, double **gamma);
-void compute_epsilon(HMM* hmm, int T, int *O, double **alpha, double **beta, double ***xi);
+void BaumWelch(HMM *hmm, int frame_num, int *O, double **alpha, double **beta, double **gamma);
 void Viterbi(HMM *hmm, int T, int *O, int *path, double *pprob);
-void ViterbiLog(HMM *hmm, int T, int *O, double **delta, int **psi, int *q, double *pprob);
-void ViterbiLog_C(HMM *hmm, int T, int *O, double **delta, int **psi, int *q, double *pprob);

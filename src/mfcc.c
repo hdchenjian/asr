@@ -1,6 +1,8 @@
 #include <string.h>
-#include "stdint.h"
+#include <stdio.h>
+#include <stdlib.h>
 
+#include "matrix.h"
 #include "mfcc.h"
 
 #define FFT_NUM    512
@@ -22,7 +24,7 @@ typedef struct {
     int32_t dataSize;           // 41-44
 } WaveHeader;
 
-WaveData wavRead(char fileName[], size_t fileNameSize)
+WaveData wavRead(char *fileName, size_t fileNameSize)
 {
     if (fileName[fileNameSize] != '\0') {
         fprintf(stderr, "wavRead: Invalid fileName: %s.\n", fileName);
@@ -51,6 +53,31 @@ WaveData wavRead(char fileName[], size_t fileNameSize)
     return data;
 }
 
+list_audio *add_audio(char *filename, list_audio *lista)
+{
+    list_audio *new = (list_audio *)calloc(1, sizeof(list_audio));
+    strcpy(new->filename , filename);
+    new->next = NULL;
+    WaveData data = wavRead(new->filename, strlen(new->filename));
+    new->sample_rate = data.sampleRate;
+    new->feature = extract_mfcc(data.data, new->sample_rate, data.size, &new->frame_num);
+    free(data.data);
+    new->class = 0;
+
+    if(lista == NULL) {
+        lista = new;
+    } else {
+    	list_audio *previous = lista;
+        list_audio *next_node = lista->next;
+        while(next_node != NULL) {
+        	previous = next_node;
+            next_node = next_node->next;
+        }
+        previous->next = new;
+    }
+    return lista;
+}
+
 /*  Function that calculates the pre-emphasis, Filter:H(z) = 1-a*z^(-1) */
 void pre_emphasize(int16_t *input, double *output, int length, double alpha)
 {
@@ -69,17 +96,13 @@ double *split_frame(double *x, int audio_data_num, int sample_rate, int audio_fr
     if(audio_data_num <= frame_length) frame_num = 1;
     else frame_num = 1 + (int)ceil((float)(audio_data_num - frame_length) / frame_step);
     *frame_num_ret = frame_num;
-    printf("audio_data_num %d frame_num %d  frame_length %d \n", audio_data_num, frame_num, frame_length);
 
     double *output = malloc(frame_num * frame_length * sizeof(double));
     for(int i = 0; i < frame_num; i++) {
         for(int j = 0; j < frame_length; j++) {
             int out_index = i * frame_length + j;
             int in_index = (i == 0) ? j : i * frame_step +j;
-            //printf("i, j %d %d in_index index %d %d\n", i, j, in_index, out_index);
-            if(in_index < audio_data_num){
-                output[out_index] = x[in_index];
-            }
+            if(in_index < audio_data_num) output[out_index] = x[in_index];
             else output[out_index] = 0;
         }
     }
@@ -130,6 +153,7 @@ int fft_complex(COMPLEX *x, uint32_t N)
             x[j].image = x[i].image;
             x[i].real = tR;
             x[i].image = tI;
+            //if(i >= 256 || j >= 256) printf("fft_complex error %d %d", i, j);
         }
         k = l;
         while (k <= j) {
@@ -156,6 +180,7 @@ int fft_complex(COMPLEX *x, uint32_t N)
                 x[ip].image = x[i].image - tI;
                 x[i].real += tR;
                 x[i].image += tI;
+                //if(i >= 256 || ip >= 256) printf("fft_complex error %d %d", i, ip);
             }
             tR = uR;
             uR = tR * sR - uI * sI;
@@ -177,7 +202,7 @@ int fft_real(COMPLEX *x, int N)
 
     /* Even/Odd frequency domain decomposition */
     ND4 = N >> 2;
-    for (i=1; i<ND4; i++) {
+    for (i = 1; i < ND4; i++) {
         j = M - i;
         k = i + M;
         l = j + M;
@@ -189,10 +214,12 @@ int fft_real(COMPLEX *x, int N)
         x[j].real = x[i].real;
         x[i].image = (x[i].image - x[j].image) / 2;
         x[j].image = -x[i].image;
+        //if(i >= 256 || j >= 256) printf("fft_real error %d %d %d %d", i, j, l, k);
     }
+    //if(N-ND4 >= 256 || M >= 256) printf("fft_real 1 error %d %d", N-ND4, M);
     x[N-ND4].real = x[ND4].image;
-    x[M].real = x[0].image;
     x[N-ND4].image = 0;
+    x[M].real = x[0].image;
     x[M].image = 0;
     x[ND4].image = 0;
     x[0].image = 0;
@@ -211,6 +238,7 @@ int fft_real(COMPLEX *x, int N)
         x[k].image = x[i].image - tI;
         x[i].real += tR;
         x[i].image += tI;
+        //if(i >= 256 || j >= 256) printf("fft_real 2 error %d %d", i, k);
 
         tR = uR;
         uR = tR * sR - uI * sI;
@@ -259,7 +287,6 @@ void get_filterbanks(int filter_num, int fft_num, int sample_rate, double *fbank
 
 void gemm_nt_log(int M, int N, int K, double *A, double *B, double *C)
 {
-    //printf("gemm M %d N %d K %d\n", M, N, K);
     for(int i = 0; i < M; i++){
         for(int j = 0; j < N; j++){
             double sum = 0;
@@ -273,7 +300,6 @@ void gemm_nt_log(int M, int N, int K, double *A, double *B, double *C)
 
 void gemm_nt_lift(int M, int N, int K, double *A, double *B, double **C)
 {
-    //printf("gemm M %d N %d K %d\n", M, N, K);
     int L = 22;
     double *lift = malloc(MFCC_COEFF_NUM * sizeof(double));
     for(int i = 0; i < MFCC_COEFF_NUM; i++){
@@ -307,6 +333,18 @@ void get_dct_coeff(int dct_num, int n, double *coeff)
     }
 }
 
+void get_delta_coeff(double **data, double **delta, int frame_num, int coeff_num)
+{
+	int left = coeff_num - 1;
+	for(int i = 0; i < frame_num; i++) {
+		delta[i][0] = (data[i][1] - data[i][0]) / 2;
+		delta[i][coeff_num - 1] = (data[i][coeff_num - 1] - data[i][coeff_num - 2]) / 2;
+	    for(int j = 1; j < left; j++) {
+			delta[i][j] = (data[i][j + 1] - data[i][j - 1]) / 2;
+	    }
+	}
+}
+
 double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, int *frame_num)
 {
     double *data = (double *)malloc(audio_data_num * sizeof(double));
@@ -315,7 +353,9 @@ double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, 
     double *frame_data = split_frame(data, audio_data_num, sample_rate, FRAME_LENGTH,
                                      FRAME_SHIFT, &sample_per_window, frame_num);
     free(data);
-    if(sample_per_window > FFT_NUM){
+    static int has_print_warning = 0;
+    if(sample_per_window > FFT_NUM && !has_print_warning){
+    	has_print_warning = 1;
         printf("frame length %d, is greater than fft_complex size %d, frame will be truncated. Increase FFT_NUM to avoid\n",
                sample_per_window, FFT_NUM);
     }
@@ -324,9 +364,9 @@ double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, 
     double *magnitude_spectrum = malloc(*frame_num * fft_num_local * sizeof(double));
     double *energy = calloc(*frame_num, sizeof(double));
     for (int m = 0; m < *frame_num; m++ ) {
-        COMPLEX data_fft[FFT_NUM / 2 + 1];
+        COMPLEX data_fft[FFT_NUM];
         int fft_num_half = FFT_NUM / 2;
-        for (int i = 0; i < fft_num_half && i * 2 < sample_per_window; i++ ){
+        for (int i = 0; i < fft_num_half && (i * 2 + 1 < sample_per_window); i++ ){
             data_fft[i].real = frame_data[m * sample_per_window + 2 * i];
             data_fft[i].image = frame_data[m * sample_per_window + 2 * i + 1];
         }
@@ -346,25 +386,31 @@ double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, 
     double *fbak_feature = (double *)malloc(*frame_num * filter_num * sizeof(double));
     gemm_nt_log(*frame_num, filter_num, fft_num_local, magnitude_spectrum, fbank, fbak_feature);
 
-
     double *dct_coeff = malloc(MFCC_COEFF_NUM * filter_num * sizeof(double));
     get_dct_coeff(MFCC_COEFF_NUM, filter_num, dct_coeff);
     double **feature = matrix_double(*frame_num, MFCC_COEFF_NUM);
     gemm_nt_lift(*frame_num, MFCC_COEFF_NUM, filter_num, fbak_feature, dct_coeff, feature);
-    for (int m = 0; m < MFCC_COEFF_NUM; m++ ) {
-        printf("feature %d %f %f %f \n", m, fbak_feature[m], dct_coeff[m], feature[0][m]);
+    double **delta = matrix_double(*frame_num, MFCC_COEFF_NUM);
+    get_delta_coeff(feature, delta, *frame_num, MFCC_COEFF_NUM);
+    double **delta_delta = matrix_double(*frame_num, MFCC_COEFF_NUM);
+    get_delta_coeff(delta, delta_delta, *frame_num, MFCC_COEFF_NUM);
+    double **feature_all = matrix_double(*frame_num, MFCC_COEFF_ALL);
+    for(int n = 0; n < *frame_num; n++) {
+    	feature_all[n][0] = log(energy[n]);
+        for(int m = 1; m < MFCC_COEFF_NUM; m++) {
+        	feature_all[n][m] = feature[n][m - 1];
+        	feature_all[n][m + MFCC_COEFF_NUM] = delta[n][m - 1];
+        	feature_all[n][m + 2 * MFCC_COEFF_NUM] = delta_delta[n][m - 1];
+        }
     }
-
-    for (int m = 0; m < *frame_num; m++ ) {
-    	feature[m][0] = log(energy[m]);
-    }
-    for (int m = 0; m < MFCC_COEFF_NUM; m++ ) {
-    	printf("feature %d %f \n", m, feature[0][m]);
-    }
+    //for(int i = 0; i < MFCC_COEFF_NUM; i++) printf("feature %d %f\n", i, feature[0][i]);
     free(fbank);
     free(magnitude_spectrum);
     free(energy);
     free(fbak_feature);
     free(dct_coeff);
-    return feature;
+    free_matrix_double(feature, *frame_num);
+    free_matrix_double(delta, *frame_num);
+    free_matrix_double(delta_delta, *frame_num);
+    return feature_all;
 }

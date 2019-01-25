@@ -1,5 +1,7 @@
 #include <math.h>
 #include <float.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 #include "matrix.h"
 #include "lbg_vq.h"
