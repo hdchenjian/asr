@@ -67,7 +67,7 @@ void Viterbi(HMM *hmm, int T, int *O, int *path, double *pprob)
     for(int i = 1; i <= hmm->N; i++) {
         delta[1][i] = hmm->pi[i] * (hmm->B[i][O[0]]);
         psi[1][i] = 0;
-        //printf("pi %d %f\n", i, hmm->pi[i]);
+        printf("pi %d %f\n", i, hmm->pi[i]);
     }
 
     /*  2. Recursion */
@@ -84,6 +84,8 @@ void Viterbi(HMM *hmm, int T, int *O, int *path, double *pprob)
                     maxvalind = i;
                 }
             }
+            printf("max delta %d %d %f %d %f\n", t, j, maxval, O[t - 1], hmm->B[j][O[t - 1]]);
+
             delta[t][j] = maxval*(hmm->B[j][O[t - 1]]);
             psi[t][j] = maxvalind;
         }
@@ -92,6 +94,7 @@ void Viterbi(HMM *hmm, int T, int *O, int *path, double *pprob)
     *pprob = 0.0;
     path[T - 1] = 1;
     for(int i = 1; i <= hmm->N; i++) {
+        printf("delta %d %f\n", i, delta[T][i]);
         if (delta[T][i] > *pprob) {
             *pprob = delta[T][i];
             path[T - 1] = i;
@@ -282,4 +285,53 @@ void BaumWelch(HMM *hmm, int frame_num, int *O, double **alpha, double **beta, d
     } while(delta > DELTA);
     free_3d_matrix(epsilon, frame_num, hmm->N);
     //free(scale);
+}
+
+void BaumWelch_with_scale(HMM *hmm, int frame_num, int *O, double **alpha, double **beta, double **gamma)
+{
+    double observe_prob;
+    double *scale = malloc((frame_num + 1) * sizeof(double));
+    Forward_with_scale(hmm, frame_num, O, alpha, scale, &observe_prob);
+    Backward_with_scale(hmm, frame_num, O, beta, scale);
+    ComputeGamma(hmm, frame_num, alpha, beta, gamma);
+    double ***epsilon = alloc_3d_matrix(frame_num, hmm->N);
+    compute_epsilon(hmm, frame_num, O, alpha, beta, epsilon);
+
+    double observe_prob_previous = observe_prob;
+    double delta;
+    do {
+        for(int i = 1; i <= hmm->N; i++) hmm->pi[i] = .001 + .999*gamma[1][i];;
+
+        for(int i = 1; i <= hmm->N; i++) {   /*  a^_ij = sum epsilon_t(i,j) / sum gamma_t(i) */
+            double sum = 0.0;
+            for(int t = 1; t <= frame_num - 1; t++) sum += gamma[t][i];
+
+            for(int j = 1; j <= hmm->N; j++) {
+                double tmp = 0.0;
+                for(int t = 1; t <= frame_num - 1; t++) tmp += epsilon[t][i][j];
+                hmm->A[i][j] = 0.001f + 0.999f * tmp / sum;
+            }
+
+            /*  b^_j(k) = sum gamma_t(j) / sum gamma_t(j) */
+            double sum_gamma = sum + gamma[frame_num][i];
+            for(int k = 1; k <= hmm->M; k++) {
+                double tmp = 0.0;
+                for(int t = 1; t <= frame_num; t++) {
+                    if (O[t - 1] == k) tmp += gamma[t][i];
+                }
+                hmm->B[i][k] = 0.001f + 0.999f * tmp / sum_gamma;
+            }
+        }
+
+        Forward_with_scale(hmm, frame_num, O, alpha, scale, &observe_prob);
+        Backward_with_scale(hmm, frame_num, O, beta, scale);
+        ComputeGamma(hmm, frame_num, alpha, beta, gamma);
+        compute_epsilon(hmm, frame_num, O, alpha, beta, epsilon);
+
+        /* Calculates the difference between the logarithmic probability of two iterations */
+        delta = log(observe_prob) - log(observe_prob_previous);
+        observe_prob_previous = observe_prob;
+    } while(delta > DELTA);
+    free_3d_matrix(epsilon, frame_num, hmm->N);
+    free(scale);
 }

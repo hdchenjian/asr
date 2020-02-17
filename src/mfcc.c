@@ -5,8 +5,7 @@
 #include "matrix.h"
 #include "mfcc.h"
 
-#define FFT_NUM    512
-#define PI   3.14159265358979
+#define PI 3.14159265358979
 
 typedef struct {
     char chunkID[4];            // 1-4      "RIFF"
@@ -61,6 +60,7 @@ list_audio *add_audio(char *filename, list_audio *lista)
     WaveData data = wavRead(new->filename, strlen(new->filename));
     new->sample_rate = data.sampleRate;
     new->feature = extract_mfcc(data.data, new->sample_rate, data.size, &new->frame_num);
+    //exit(-1);
     free(data.data);
     new->class = 0;
 
@@ -86,10 +86,10 @@ void pre_emphasize(int16_t *input, double *output, int length, double alpha)
     for(int i = 1; i < length; i++) output[i] = (double)input[i] - alpha * (double)input[i - 1];
 }
 
-double *split_frame(double *x, int audio_data_num, int sample_rate, int audio_frame_num,
+double *split_frame(double *x, int audio_data_num, int sample_rate, int audio_frame_length,
                     int frame_shift, int *sample_per_window_ret, int *frame_num_ret)
 {
-    int frame_length = floor((float)sample_rate * audio_frame_num / 1000 + 0.5);
+    int frame_length = floor((float)sample_rate * audio_frame_length / 1000 + 0.5);
     *sample_per_window_ret = frame_length;
     int frame_step = floor((float)sample_rate * frame_shift / 1000 + 0.5);
     int frame_num = 0;
@@ -355,7 +355,7 @@ double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, 
     free(data);
     static int has_print_warning = 0;
     if(sample_per_window > FFT_NUM && !has_print_warning){
-    	has_print_warning = 1;
+    	has_print_warning = 0;
         printf("frame length %d, is greater than fft_complex size %d, frame will be truncated. Increase FFT_NUM to avoid\n",
                sample_per_window, FFT_NUM);
     }
@@ -364,7 +364,7 @@ double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, 
     double *magnitude_spectrum = malloc(*frame_num * fft_num_local * sizeof(double));
     double *energy = calloc(*frame_num, sizeof(double));
     for (int m = 0; m < *frame_num; m++ ) {
-        COMPLEX data_fft[FFT_NUM];
+        COMPLEX data_fft[FFT_NUM] = {0};
         int fft_num_half = FFT_NUM / 2;
         for (int i = 0; i < fft_num_half && (i * 2 + 1 < sample_per_window); i++ ){
             data_fft[i].real = frame_data[m * sample_per_window + 2 * i];
@@ -397,13 +397,13 @@ double **extract_mfcc(int16_t *audio_data, int sample_rate, int audio_data_num, 
     double **feature_all = matrix_double(*frame_num, MFCC_COEFF_ALL);
     for(int n = 0; n < *frame_num; n++) {
     	feature_all[n][0] = log(energy[n]);
-        for(int m = 1; m < MFCC_COEFF_NUM; m++) {
+        for(int m = 1; m <= MFCC_COEFF_NUM; m++) {
         	feature_all[n][m] = feature[n][m - 1];
         	feature_all[n][m + MFCC_COEFF_NUM] = delta[n][m - 1];
         	feature_all[n][m + 2 * MFCC_COEFF_NUM] = delta_delta[n][m - 1];
         }
     }
-    //for(int i = 0; i < MFCC_COEFF_NUM; i++) printf("feature %d %f\n", i, feature[0][i]);
+    //for(int i = 0; i < MFCC_COEFF_ALL; i++) printf("feature %d %f\n", i, feature_all[0][i]);
     free(fbank);
     free(magnitude_spectrum);
     free(energy);

@@ -105,7 +105,7 @@ int *lbg_encode(double **codebook, double **data, int M, int K, int N)
                 index = n;
             }
         }
-        result_vq[m] = index;
+        result_vq[m] = index + 1;
     }
     return result_vq;
 }

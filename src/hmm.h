@@ -13,4 +13,5 @@ typedef struct {
 void FreeHMM(HMM *hmm);
 void InitHMM(HMM *hmm, int N, int M, int seed);
 void BaumWelch(HMM *hmm, int frame_num, int *O, double **alpha, double **beta, double **gamma);
+void BaumWelch_with_scale(HMM *hmm, int frame_num, int *O, double **alpha, double **beta, double **gamma);
 void Viterbi(HMM *hmm, int T, int *O, int *path, double *pprob);

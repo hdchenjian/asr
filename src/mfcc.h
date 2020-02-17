@@ -3,8 +3,10 @@
 
 #define MFCC_COEFF_NUM 13
 #define MFCC_COEFF_ALL 40
-#define FRAME_LENGTH 25
+#define FRAME_LENGTH 23
 #define FRAME_SHIFT 10
+#define FFT_NUM 1024
+
 
 typedef struct {
     int16_t *data;

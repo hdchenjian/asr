@@ -131,7 +131,8 @@ int main()
     current_audio = train_list;
 
     while(current_audio != NULL) {
-        BaumWelch(&hmm[current_audio->class], current_audio->frame_num, current_audio->vq_result, alpha, beta, gamma);
+    	BaumWelch_with_scale(&hmm[current_audio->class], current_audio->frame_num, current_audio->vq_result, alpha, beta, gamma);
+        break;
         current_audio = current_audio->next;
     }
     free_dmatrix(alpha, max_frame_num);
@@ -141,7 +142,8 @@ int main()
 
     int test_num  = 40;
     char **test_list = (char **)malloc(sizeof(char*) * test_num);
-    test_list[0] = "audio/test/00_04_giuseppe.s.wav";
+    //test_list[0] = "audio/test/00_04_giuseppe.s.wav";
+    test_list[0] = "audio/train/00_01_giuseppe.s.wav";
     test_list[1] = "audio/test/00_05_giuseppe.s.wav";
     test_list[2] = "audio/test/00_04_pietro.r.wav";
     test_list[3] = "audio/test/00_05_pietro.r.wav";
@@ -203,6 +205,7 @@ int main()
         for(int i = 0; i < CLASS_NUM; ++i){
             Viterbi(&hmm[i], frame_num, audio_vq, path, &probability);
             printf("%d %s class %d %f\n", i, test_list[j], test_class, probability);
+            break;
         }
         free(path);
         free(audio_vq);
